@@ -30,7 +30,8 @@ the backplate, a Flex ATX PSU, and front USB.
 ## Documentation
 
 - [`BOM.md`](BOM.md): everything to buy.
-- [`stls/README.md`](stls/README.md): what to print, how to print it, and how to put it together.
+- [`stls/README.md`](stls/README.md): what to print and how to print it.
+- [`stls/ASSEMBLY.md`](stls/ASSEMBLY.md): how to put it together (a work in progress).
 - [`renders/README.md`](renders/README.md): every render, inside and out.
 
 ## Building
