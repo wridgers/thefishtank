@@ -1,0 +1,9 @@
+# build logs (make writes them; the reason for a failed build is in here)
+logs/
+# Python bytecode from running the generators
+__pycache__/
+# the BC-250 model's licence (Printables Standard Digital File License) does not allow
+# redistributing it: download it yourself (see the Makefile)
+cad/step/bc250.step
+# make builds this from that STEP, so it carries the same model and can't be redistributed either
+cad/bc250_board.FCStd
