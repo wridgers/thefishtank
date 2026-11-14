@@ -19,14 +19,10 @@ The printed parts are listed in [stls/README.md](stls/README.md).
 
 | Qty | Item |
 |---:|---|
-| 1 | BHCS M3x8 (ISO 7380) |
-| 4 | BHCS M3x10 (ISO 7380) |
+| 8 | BHCS M3x10 (ISO 7380) |
 | 4 | BHCS M3x20 (ISO 7380) |
 | 4 | BHCS M3x25 (ISO 7380) |
 | 2 | FHCS #6-32 x 3/8" (82 deg), for the PSU |
-| 4 | FHCS M3x10 (ISO 10642 / DIN 7991) |
-| 4 | FHCS M3x12 (ISO 10642 / DIN 7991) |
-| 4 | FHCS M3x16 (ISO 10642 / DIN 7991) |
+| 12 | FHCS M3x12 (ISO 10642 / DIN 7991) |
 | 8 | FHCS M3x40 (ISO 10642 / DIN 7991) |
 | 36 | [M3 heat-set insert, Voron spec (M3 x 5 mm OD x 4 mm)](https://jb3d.uk/product/50-threaded-heat-set-inserts-m3-x-d5-0-x-l4-0/) |
-| 3 | SHCS M3x10 (ISO 4762) |

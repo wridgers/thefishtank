@@ -104,9 +104,9 @@ CASE = [
     # (standing), tall ones on the right side (lying with the push-pull fans up, the backplate fan
     # intake under the case). Positions come from the pattern (layout()).
     ('FootSize', '=HexP + GrooveW + 0.4', 'Foot across flats: covers its cell and the grooves round it'),
-    ('FootShortH', 7.0, 'Standing foot height'), ('FootShortRecess', 1.0, 'Screw head below the foot face (M3x10)'),
+    ('FootShortH', 9.0, 'Standing foot height'), ('FootShortRecess', 1.0, 'Screw head below the foot face (FHCS M3x12)'),
     ('FootTallH', 15.0, 'Lying foot height: clearance for the backplate fan intake'),
-    ('FootTallRecess', 3.0, 'Screw head below the foot face (M3x16)'),
+    ('FootTallRecess', 7.0, 'Screw head below the foot face (FHCS M3x12, the same screw as the short feet and the joints)'),
     ('FootKeyW', 0.6, 'Key ribs on the foot that sit in the cell grooves'), ('FootKeyH', 0.4, ''),
     ('FootChamfer', 1.0, 'Foot ground edge chamfer'),
     # --- back panel

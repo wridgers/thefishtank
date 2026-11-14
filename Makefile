@@ -59,8 +59,9 @@ $(CASE_FCSTD) &: scripts/gen_case.py scripts/case_pattern.py scripts/gen_shrouds
 	$(call generate,case,scripts/gen_case.py)
 
 # The assembly script also writes the reference models into cad/, re-saves the printed parts with
-# their colours, checks every pair of parts for overlaps and renders the images. It re-saves the
-# part files last, so its own outputs are touched afterwards to keep make from rerunning it.
+# their colours, checks every pair of parts for overlaps, and renders the images. It re-saves the
+# part files, which are also its inputs, so its own outputs are touched afterwards to keep make from
+# rerunning it.
 $(ASSEMBLY) $(RENDERS) renders/README.md BOM.md &: scripts/build_assembly.py $(SHROUD_FCSTD) $(CASE_FCSTD) $(BC_STEP) $(FAN_STEP)
 	@mkdir -p logs renders
 	OUTDIR=$(CURDIR) BC_STEP=$(abspath $(BC_STEP)) FAN_STEP=$(abspath $(FAN_STEP)) \

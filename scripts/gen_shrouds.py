@@ -49,10 +49,12 @@ PUSH = COMMON + [
     ('ScoopBaseZ', 1.5, 'Entry scoop: arc centre height'),
     ('ScoopTopZ', 23.7, 'Entry scoop: tip height (outer surface)'),
     ('RoofInnerR', 16.5, 'End roof: inner (underside) arc radius'),
-    ('RoofLandX', 38.65, 'End roof: where underside meets the top plane'),
-    ('RoofLandEnd', 47.0, 'End roof: end of flat top land'),
+    ('RoofLandX', 38.65, 'End roof: where the underside, extended, meets the top plane (the roof edge stops '
+                         'ScoopTip thick, just short of it)'),
     ('RoofArcZ', '=Height - RoofInnerR * sin(MaxOverhang) - (XEnd - WallT - RoofInnerR * (1 - cos(MaxOverhang)) - RoofLandX) / tan(MaxOverhang)',
      'End roof: arc centre height (derived)'),
+    ('RoofLandEnd', '=XEnd - (RoofInnerR + WallT) * (1 - cos(MaxOverhang)) - (Height - RoofArcZ - (RoofInnerR + WallT) * sin(MaxOverhang)) * tan(MaxOverhang)',
+     'End roof: where the outer slope meets the top plane (derived)'),
     ('PcbEndX', 45.0, 'X of the PCB end edge'),
     ('EndClampX0', '=PcbEndX + ClampGap', 'End clamp block start'),
     ('ClampX1', -60.0, 'Side clamp position (X); clears the PCB power-connector extension'),
@@ -315,11 +317,25 @@ def shroud_chamfers(body, P):
     x0, x1, h = P['XEntry'], P['XEnd'], P['HalfW']
     corner = vertical_at([(x, y) for x in (x0, x1) for y in (h, -h)])
 
-    def ok(e):  # skip corners OCC can't chamfer (push shroud entry side, where the scoop meets the wall)
+    def ok(e):
         try:
             return body.Tip.Shape.makeChamfer(P['CornerChamfer'], [e]).isValid()
         except Exception:
             return False
+    # OCC can't chamfer some corners (push shroud entry side, where the scoop root and both wall ends
+    # share one face): cut those with a 45 deg triangular pocket instead, run past the corner
+    body.Document.recompute()
+    bad = [(b.XMin, b.YMin) for b in (e.BoundBox for e in body.Tip.Shape.Edges if corner(e) and not ok(e))]
+    if bad:
+        s = SK(body, P, 'CornerCutSketch', 'XY_Plane')
+        for x, y in bad:
+            X = 'XEntry' if abs(x - x0) < 1e-6 else 'XEnd'
+            Y = 'HalfW' if y > 0 else '-HalfW'
+            sx, sy = ('+', '-') if X == 'XEntry' else ('-', '+'), ('+', '-') if Y == 'HalfW' else ('-', '+')
+            s.polygon([(f'{X} {sx[0]} (CornerChamfer + 0.5)', f'{Y} {sy[0]} 0.5'),
+                       (f'{X} {sx[1]} 0.5', f'{Y} {sy[0]} 0.5'),
+                       (f'{X} {sx[1]} 0.5', f'{Y} {sy[1]} (CornerChamfer + 0.5)')])
+        feat(body, P, 'Pocket', 'CornerCut', s, 'Height + 10', Reversed=True)
     chamfer(body, P, 'CornerChamfer', 'CornerChamfer', lambda e: corner(e) and ok(e))
     chamfer(body, P, 'BedChamfer', 'BedChamfer', at_z(0))
 
@@ -371,12 +387,15 @@ def entry_scoop(body, P):
     xe, zb = P['XEntry'], P['ScoopBaseZ']
     C = (xe + Ro, zb)
     tip = lambda r: (C[0] + r * math.cos(math.radians(180 - A)), zb + r * math.sin(math.radians(180 - A)))
-    Ci, Ri, q, aq = taper_arc(C, Ro, 180 - A, xe + P['ScoopT'], zb, P['ScoopTip'])
+    # the inside stays vertical up to the flange top before curving, so the flange (which stops at the
+    # scoop's inside face) leaves no step on either face
+    zf = P['FlangeT']
+    Ci, Ri, q, aq = taper_arc(C, Ro, 180 - A, xe + P['ScoopT'], zf, P['ScoopTip'])
     Lv0 = s.line((xe, 0), (xe, zb))
     Ao = s.arc(C, Ro, 180 - A, 180)
     Le = s.line(tip(Ro), q)
     Ai = s.arc(Ci, Ri, aq, 180)
-    Lv1 = s.line((xe + P['ScoopT'], zb), (xe + P['ScoopT'], 0))
+    Lv1 = s.line((xe + P['ScoopT'], zf), (xe + P['ScoopT'], 0))
     Lb = s.line((xe + P['ScoopT'], 0), (xe, 0))
     s.c('Horizontal', Lb); s.c('PointOnObject', Lb, 2, -1); s.px(Lb, 2, 'XEntry')
     s.px(Lb, 1, 'XEntry + ScoopT')
@@ -388,7 +407,7 @@ def entry_scoop(body, P):
     s.co(Ao, 1, Le, 1); s.co(Le, 2, Ai, 1)
     s.c('PointOnObject', Ao, 3, Le)  # the edge face points at the outside arc's centre
     s.dim('Distance', Le, expr='ScoopTip', name='ScoopTip')
-    s.py(Ai, 3, 'ScoopBaseZ')
+    s.py(Ai, 3, 'FlangeT')
     s.c('Tangent', Ai, 2, Lv1, 1); s.c('Vertical', Lv1)
     s.co(Lv1, 2, Lb, 1)
     feat(body, P, 'Pad', 'EntryScoop', s, '2 * HalfW', SideType='Symmetric')
@@ -402,12 +421,10 @@ def roof_outer(s, P, x_entry_close):
     C = (xe - Ro, zc)
     a = math.radians(A)
     P3 = (C[0] + Ro * math.cos(a), zc + Ro * math.sin(a))
-    z4 = P3[1] + (P3[0] - P['RoofLandEnd']) / math.tan(a)
     L1 = s.line((xe, 0), (xe, zc))
     Ao = s.arc(C, Ro, 0, A)
-    L2 = s.line(P3, (P['RoofLandEnd'], z4))
-    L3 = s.line((P['RoofLandEnd'], z4), (P['RoofLandEnd'], H))
-    xt = P['XEntry'] if x_entry_close else P['RoofLandX']
+    L2 = s.line(P3, (P['RoofLandEnd'], H))  # the outer slope runs straight onto the top plane
+    xt = P['XEntry'] if x_entry_close else P['RoofLandX'] + P['ScoopTip'] * math.tan(a)
     L4 = s.line((P['RoofLandEnd'], H), (xt, H))
     s.c('Vertical', L1); s.px(L1, 1, 'XEnd')
     s.c('Tangent', L1, 2, Ao, 1)
@@ -415,23 +432,26 @@ def roof_outer(s, P, x_entry_close):
     s.dim('Angle', Ao, expr='MaxOverhang', angle=True)
     s.py(Ao, 3, 'RoofArcZ')
     s.c('Tangent', Ao, 2, L2, 1)
-    s.co(L2, 2, L3, 1); s.c('Vertical', L3); s.px(L3, 1, 'RoofLandEnd')
-    s.co(L3, 2, L4, 1); s.c('Horizontal', L4); s.py(L4, 1, 'Height')
-    return L1, Ao, L2, L3, L4
+    s.co(L2, 2, L4, 1); s.c('Horizontal', L4); s.py(L4, 1, 'Height')
+    return L1, Ao, L2, L4
 
 
 def push_end_roof(body, P):
     s = SK(body, P, 'EndRoofSketch', 'XZ_Plane')
-    L1, Ao, L2, L3, L4 = roof_outer(s, P, False)
+    L1, Ao, L2, L4 = roof_outer(s, P, False)
     A = math.radians(P['MaxOverhang']); Ri = P['RoofInnerR']
     xi = P['XEnd'] - P['WallT']; zc = P['RoofArcZ']
     C = (xi - Ri, zc)
     P7 = (C[0] + Ri * math.cos(A), zc + Ri * math.sin(A))
-    L5 = s.line((P['RoofLandX'], P['Height']), P7)
+    # the roof edge: a ScoopTip-high face instead of the knife edge where the underside meets the top
+    xk, zk = P['RoofLandX'] + P['ScoopTip'] * math.tan(A), P['Height'] - P['ScoopTip']
+    Lk = s.line((xk, P['Height']), (xk, zk))
+    L5 = s.line((xk, zk), P7)
     Ai = s.arc(C, Ri, 0, P['MaxOverhang'])
     L6 = s.line((xi, zc), (xi, 0))
     L0 = s.line((xi, 0), (P['XEnd'], 0))
-    s.co(L4, 2, L5, 1)
+    s.co(L4, 2, Lk, 1); s.c('Vertical', Lk); s.dim('Distance', Lk, expr='ScoopTip', name='RoofTip')
+    s.co(Lk, 2, L5, 1)
     s.c('Tangent', L5, 2, Ai, 2)
     s.co(Ao, 3, Ai, 3)
     s.dim('Radius', Ai, expr='RoofInnerR', name='RoofInnerR')
@@ -446,7 +466,7 @@ def side_walls(body, P, roof):
     s = SK(body, P, 'SideWallSketch', 'XZ_Plane', offset='HalfW - WallT')
     H = P['Height']
     if roof:
-        L1, Ao, L2, L3, L4 = roof_outer(s, P, True)
+        L1, Ao, L2, L4 = roof_outer(s, P, True)
         L5 = s.line((P['XEntry'], H), (P['XEntry'], 0))
         L0 = s.line((P['XEntry'], 0), (P['XEnd'], 0))
         s.co(L4, 2, L5, 1); s.c('Vertical', L5); s.px(L5, 1, 'XEntry')
@@ -458,20 +478,26 @@ def side_walls(body, P, roof):
     return pad, mirror(body, 'SideWallMirror', [pad])
 
 
-def side_clamps(body, P, xs):
-    """Clamp blocks outside the side walls with 45 deg undersides; bar + M3 screw into an insert."""
+def side_clamps(body, P, xs, start=None):
+    """Clamp blocks outside the side walls with 45 deg undersides; bar + M3 screw into an insert.
+    With start, the first block runs from x = start (flush with the shroud end) instead of being centred."""
     pads = []
     for i, x in enumerate(xs, start=1):
-        s = SK(body, P, f'SideClamp{i}Sketch', 'YZ_Plane', offset=x)
-        # yi is inside the wall; the block's inner face locates on the PCB edge (PcbW / 2 + ClampGap)
+        far = f'{x} + ClampW / 2'
+        s = SK(body, P, f'SideClamp{i}Sketch', 'YZ_Plane', offset=far if start and i == 1 else x)
+        # yi is inside the wall, past a corner chamfer, so a block refills the chamfer above its underside;
+        # the block's inner face locates on the PCB edge (PcbW / 2 + ClampGap)
         # the fence (yo..yf) stands FenceH above the block so the bar can't swing round its screw
-        yi, yl, yo = 'HalfW - 0.5', 'PcbW / 2 + ClampGap', 'PcbW / 2 + ClampGap + ClampBlock'
+        yi, yl, yo = 'HalfW - CornerChamfer - 0.5', 'PcbW / 2 + ClampGap', 'PcbW / 2 + ClampGap + ClampBlock'
         yf = f'{yo} + FenceT'
         zf = 'ClampTopZ - ClampDrop'
         s.polygon([(yi, f'{zf} - ({yf} - ({yi}))'), (yf, zf), (yf, 'ClampTopZ + FenceH'),
                    (yo, 'ClampTopZ + FenceH'), (yo, 'ClampTopZ'),
                    (yl, 'ClampTopZ'), (yl, 'Height'), (yi, 'Height')])
-        pads.append(feat(body, P, 'Pad', f'SideClamp{i}', s, 'ClampW', SideType='Symmetric'))
+        if start and i == 1:
+            pads.append(feat(body, P, 'Pad', f'SideClamp{i}', s, f'{far} - ({start})', Reversed=True))
+        else:
+            pads.append(feat(body, P, 'Pad', f'SideClamp{i}', s, 'ClampW', SideType='Symmetric'))
     mirror(body, 'SideClampMirror', pads)
 
 
@@ -496,7 +522,7 @@ def clamp_holes(body, P, pts):
 
 def build_push():
     doc, P, body = new_part('fan_shroud_push', PUSH)
-    flange_and_fan_bosses(body, P)
+    flange_and_fan_bosses(body, P, ('XEntry + ScoopT', 'XEnd', '-HalfW', 'HalfW'))  # the scoop root is the edge
     side_walls(body, P, roof=True)
     entry_scoop(body, P)
     push_end_roof(body, P)
@@ -507,20 +533,22 @@ def build_push():
     s.polygon([(x0, zb(x0)), (x2, zb(x2)), (x2, 'ClampTopZ + FenceH'), (x1, 'ClampTopZ + FenceH'),
                (x1, 'ClampTopZ'), (x0, 'ClampTopZ')])
     feat(body, P, 'Pad', 'EndClamp', s, 'ClampW', SideType='Symmetric')
-    side_clamps(body, P, ['ClampX1'])
     # component clearance notch in +Y wall (XZ normal is -Y; plane at Y=HalfW+1, cut toward -Y)
     s = SK(body, P, 'SideNotchSketch', 'XZ_Plane', offset='-(HalfW + 1)')
     s.rect('SideNotchX0', 'SideNotchX1', 'Height - SideNotchDepth', 'Height + 5')
     feat(body, P, 'Pocket', 'SideNotch', s, 'WallT + 2', Reversed=True)
+    # chamfer the entry corners before the side clamps go on: the clamps (flush with the entry end)
+    # fill the chamfer back in above their 45 deg undersides
+    shroud_chamfers(body, P)
+    side_clamps(body, P, ['ClampX1'], start='XEntry')
     clamp_holes(body, P, [('ClampX1', 'ClampHoleOff'), ('ClampX1', '-ClampHoleOff'),
                           ('EndClampX0 + ClampBlock / 2', '0')])
-    shroud_chamfers(body, P)
     return doc, body
 
 
 def build_pull():
     doc, P, body = new_part('fan_shroud_pull', PULL)
-    flange_and_fan_bosses(body, P)
+    flange_and_fan_bosses(body, P, ('XEntry + ScoopT', 'XEnd', '-HalfW', 'HalfW'))  # the scoop root is the edge
     side_walls(body, P, roof=False)
     entry_scoop(body, P)
     # end wall + scoop that branches off it

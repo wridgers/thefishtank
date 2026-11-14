@@ -3,7 +3,7 @@
 # optional SLIM_FAN_STEP (a STEP of the 120x15 slim fan; otherwise a model built from its dimensions)
 import math, os, re, traceback
 import FreeCAD as App, FreeCADGui as Gui, Part
-from PySide import QtCore
+from PySide import QtCore, QtGui
 
 V, Rot = App.Vector, App.Rotation
 OUT = os.environ['OUTDIR']  # project folder: BOM.md here, every FreeCAD file in cad/
@@ -218,16 +218,6 @@ def build_hardware():
     body = body.cut(Part.makeCylinder(1.25, 4, V(0, 0, 0))).removeSplitter()
     feature(doc, ins, 'Insert', body, (0.85, 0.66, 0.28))
 
-    def shcs(length):
-        # ISO 4762 M3: head dia 5.5, height 3, 2.5 hex socket. Bearing face at z=0, shank to -length.
-        p = doc.addObject('App::Part', f'SHCS_M3x{length}')
-        head = Part.makeCylinder(2.75, 3)
-        hexw = Part.makePolygon([V(1.25 / math.cos(math.radians(30)) * math.cos(math.radians(a)),
-                                   1.25 / math.cos(math.radians(30)) * math.sin(math.radians(a)), 1.4)
-                                 for a in range(0, 361, 60)])
-        sock = Part.Face(hexw).extrude(V(0, 0, 1.7))
-        s = head.cut(sock).fuse(Part.makeCylinder(1.5, length, V(0, 0, -length))).removeSplitter()
-        feature(doc, p, 'Screw', s, (0.10, 0.10, 0.11))
     def bhcs(length):
         # ISO 7380 M3: head dia 5.7, height 1.65, 2.0 hex socket. Bearing face at z=0, shank to -length.
         p = doc.addObject('App::Part', f'BHCS_M3x{length}')
@@ -251,10 +241,9 @@ def build_hardware():
             s = s.cut(Part.Face(hexw).extrude(V(0, 0, 1.1)))
         s = s.fuse(Part.makeCylinder(d / 2, length - k, V(0, 0, -length))).removeSplitter()
         feature(doc, p, 'Screw', s, (0.10, 0.10, 0.11) if socket else (0.6, 0.6, 0.62))
-    for length in (25, 20, 10, 8):
+    for length in (25, 20, 10):
         bhcs(length)
-    shcs(10)
-    for length in (40, 16, 12, 10):  # ISO 10642 M3: head dia 6.72 (theoretical), 90 deg, 2.0 hex socket
+    for length in (40, 12):  # ISO 10642 M3: head dia 6.72 (theoretical), 90 deg, 2.0 hex socket
         fhcs(f'FHCS_M3x{length}', length, 6.72, 90, 3.0, 2.0)
     fhcs('FHCS_6_32x3_8', 9.525, 6.6, 82, 3.5)  # #6-32 x 3/8" flat head (82 deg), for the PSU
     doc.recompute()
@@ -315,7 +304,7 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
 
     insert = hw.getObject('Insert_M3x5x4')
     m3x40, m3x25, m3x20 = hw.getObject('FHCS_M3x40'), hw.getObject('BHCS_M3x25'), hw.getObject('BHCS_M3x20')
-    m3x10 = hw.getObject('SHCS_M3x10')
+    m3x10 = hw.getObject('BHCS_M3x10')
     K = case.Name + '#Params.'
     T = tpu.Name + '#Params.'
     far_face = f'-26 - {T}GasketT'  # fan far face (pads compressed to nothing)
@@ -415,8 +404,7 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
     link(cgrp, 'PowerButton', button.getObject('Button'), Rot(V(0, 1, 0), 90), (K + 'XFront', K + 'ButtonY', K + 'ButtonZ'))
     link(cgrp, 'USB_Hub', hub.getObject('Hub'), Rot(V(0, 0, 1), 90),
          (K + 'HubFaceX', K + 'HubY0', f'{K}HubZ - {K}HubT / 2'))
-    m3x10b, m3x8b, m3x10c = hw.getObject('BHCS_M3x10'), hw.getObject('BHCS_M3x8'), hw.getObject('FHCS_M3x10')
-    m3x12c = hw.getObject('FHCS_M3x12')
+    m3x10b, m3x12c = hw.getObject('BHCS_M3x10'), hw.getObject('FHCS_M3x12')
     down, up = Rot(V(1, 0, 0), 90), Rot(V(1, 0, 0), -90)  # z axis -> -Y / +Y
     for i in (1, 2):
         zt, zb = K + f'RibZTop{i}', K + f'RibZBot{i}'
@@ -428,7 +416,6 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
         link(cgrp, f'JointScrewBottom{i}_M3x12', m3x12c, down, (K + 'JointX', K + 'YBot', zb))
     # feet: inserts in the bottom and the right side; short feet on the bottom (standing, shown) and
     # tall ones on the right side (lying on that side, hidden; the renders show both)
-    m3x16c = hw.getObject('FHCS_M3x16')
     for a in (1, 2):
         x = K + f'FootX{a}'
         for b in (1, 2):
@@ -436,14 +423,14 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
             link(cgrp, f'FootInsertBot{a}{b}', insert, up, (x, K + 'YBot', z))
             link(cgrp, f'FootInsertSide{a}{b}', insert, Rot(), (x, y, K + 'ZRight'))
             link(cgrp, f'StandFoot{a}{b}', case.getObject('TpuFootShort'), up, (x, f'{K}YBot - {K}FootShortH', z))
-            link(cgrp, f'StandFootScrew{a}{b}_M3x10', m3x10c, down,
+            link(cgrp, f'StandFootScrew{a}{b}_M3x12', m3x12c, down,
                  (x, f'{K}YBot - {K}FootShortH + {K}FootShortRecess', z))
             for o in (link(cgrp, f'LyingFoot{a}{b}', case.getObject('TpuFootTall'), Rot(), (x, y, f'{K}ZRight - {K}FootTallH')),
-                      link(cgrp, f'LyingFootScrew{a}{b}_M3x16', m3x16c, flip,
+                      link(cgrp, f'LyingFootScrew{a}{b}_M3x12', m3x12c, flip,
                            (x, y, f'{K}ZRight - {K}FootTallH + {K}FootTallRecess'))):
                 o.Visibility = False
     link(cgrp, 'TabInsert', insert, down, (K + 'TabX', K + 'TabUnderY', K + 'TabZ'))
-    link(cgrp, 'TabScrew_M3x8', m3x8b, up, (K + 'TabX', f'{K}TabUnderY + 1.1', K + 'TabZ'))
+    link(cgrp, 'TabScrew_M3x10', m3x10b, up, (K + 'TabX', f'{K}TabUnderY + 1.1', K + 'TabZ'))
     for n, z in (('A', 'HubRibZA'), ('B', 'HubRibZB')):
         for i, y in ((1, 'RetY1'), (2, 'RetY2')):
             link(cgrp, f'HubInsert{n}{i}', insert, Rot(V(0, 1, 0), 90), (K + 'HubBackX', K + y, K + z))
@@ -477,15 +464,11 @@ BUY = {
     ('power_button_16mm', 'Button'): ('Components', 'mosfet.party 16 mm backlit power button with built-in latching adapter'),
     ('hardware_m3', 'Insert_M3x5x4'): ('Hardware', 'M3 heat-set insert, Voron spec (M3 x 5 mm OD x 4 mm)'),
     ('hardware_m3', 'FHCS_M3x40'): ('Hardware', 'FHCS M3x40 (ISO 10642 / DIN 7991)'),
-    ('hardware_m3', 'FHCS_M3x16'): ('Hardware', 'FHCS M3x16 (ISO 10642 / DIN 7991)'),
     ('hardware_m3', 'FHCS_M3x12'): ('Hardware', 'FHCS M3x12 (ISO 10642 / DIN 7991)'),
-    ('hardware_m3', 'FHCS_M3x10'): ('Hardware', 'FHCS M3x10 (ISO 10642 / DIN 7991)'),
     ('hardware_m3', 'FHCS_6_32x3_8'): ('Hardware', 'FHCS #6-32 x 3/8" (82 deg), for the PSU'),
     ('hardware_m3', 'BHCS_M3x25'): ('Hardware', 'BHCS M3x25 (ISO 7380)'),
     ('hardware_m3', 'BHCS_M3x20'): ('Hardware', 'BHCS M3x20 (ISO 7380)'),
     ('hardware_m3', 'BHCS_M3x10'): ('Hardware', 'BHCS M3x10 (ISO 7380)'),
-    ('hardware_m3', 'BHCS_M3x8'): ('Hardware', 'BHCS M3x8 (ISO 7380)'),
-    ('hardware_m3', 'SHCS_M3x10'): ('Hardware', 'SHCS M3x10 (ISO 4762)'),
 }
 # Where to buy, for the items that have a link (BOM.md only).
 LINKS = {
@@ -582,11 +565,56 @@ def look(v, cam, up=(0, 1, 0)):
     Gui.updateGui()
 
 
+def render_style():
+    """Render-only looks, applied after the files are saved: matte surfaces, and edges tinted toward each
+    part's colour (lighter on dark parts, darker on light ones) so the hex grooves read without hard
+    black lines."""
+    for d in App.listDocuments().values():
+        for o in d.Objects:
+            vo = getattr(o, 'ViewObject', None)
+            if vo is None or not hasattr(vo, 'ShapeAppearance'):
+                continue
+            mats = list(vo.ShapeAppearance)
+            for m in mats:
+                m.Shininess = 0.12; m.SpecularColor = (0.15, 0.15, 0.15, 1.0)
+            vo.ShapeAppearance = mats
+            if hasattr(vo, 'LineColor') and hasattr(vo, 'ShapeColor'):
+                c = vo.ShapeColor[:3]
+                dark = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2] < 0.3
+                vo.LineColor = tuple(min(1.0, x + 0.16) for x in c) if dark else tuple(x * 0.62 for x in c)
+                vo.LineWidth = 1.0
+
+
+def compose(raw, dst, size, margin=0.07):
+    """Crop a transparent render to the model, centre it with a margin on a soft gradient and scale it
+    down to size (rendering at twice the size and scaling down anti-aliases the edges)."""
+    import numpy as np
+    img = QtGui.QImage(raw).convertToFormat(QtGui.QImage.Format_ARGB32)
+    W, H = img.width(), img.height()
+    alpha = np.frombuffer(img.constBits(), np.uint8, W * H * 4).reshape(H, W, 4)[:, :, 3]
+    rows, cols = np.flatnonzero(alpha.any(1)), np.flatnonzero(alpha.any(0))
+    box = QtCore.QRect(int(cols[0]), int(rows[0]), int(cols[-1] - cols[0] + 1), int(rows[-1] - rows[0] + 1))
+    k = min(W * (1 - 2 * margin) / box.width(), H * (1 - 2 * margin) / box.height())
+    model = img.copy(box).scaled(int(box.width() * k), int(box.height() * k), QtCore.Qt.KeepAspectRatio,
+                                 QtCore.Qt.SmoothTransformation)
+    out = QtGui.QImage(W, H, QtGui.QImage.Format_ARGB32)
+    p = QtGui.QPainter(out)
+    g = QtGui.QRadialGradient(W / 2, H * 0.4, W * 0.75)
+    g.setColorAt(0, QtGui.QColor(250, 251, 252)); g.setColorAt(1, QtGui.QColor(208, 214, 222))
+    p.fillRect(out.rect(), g)
+    p.drawImage((W - model.width()) // 2, (H - model.height()) // 2, model)
+    p.end()
+    out.scaled(*size, QtCore.Qt.IgnoreAspectRatio, QtCore.Qt.SmoothTransformation).save(dst)
+    os.remove(raw)
+
+
 def shots(doc, case_grp):
     """Render the images and write renders/README.md listing them."""
     out = os.environ['SHOTS']
     Gui.setActiveDocument(doc.Name)
     v = Gui.activeDocument().activeView()
+    render_style()
+    v.setCameraType('Perspective')
     Gui.updateGui()
     for o in doc.Objects:  # grounded-joint markers
         if o.TypeId == 'Assembly::JointGroup':
@@ -616,7 +644,9 @@ def shots(doc, case_grp):
         lines += [f'## {heading}', ''] + ([note, ''] if note else [])
         for name, caption, cam in views:
             look(v, cam, up)
-            v.saveImage(os.path.join(out, f'{name}.png'), 1600, 1000, 'White')
+            raw = os.path.join(out, f'{name}.raw.png')
+            v.saveImage(raw, 3200, 2000, 'Transparent')
+            compose(raw, os.path.join(out, f'{name}.png'), (1600, 1000))
         for i in range(0, len(views), 2):  # two to a row
             row = views[i:i + 2]
             lines += ['| ' + ' | '.join(c for _, c, _ in row) + ' |', '|' + '---|' * len(row),
@@ -629,6 +659,11 @@ def main():
     prefs = App.ParamGet('User parameter:BaseApp/Preferences/Document')
     backups = prefs.GetBool('CreateBackupFiles', True)
     prefs.SetBool('CreateBackupFiles', False)  # every file here is regenerated; restored below
+    # renders: a back light to separate the dark faces (restored below too)
+    view = App.ParamGet('User parameter:BaseApp/Preferences/View')
+    lights = (view.GetBool('EnableBacklight', False), view.GetInt('BacklightIntensity', 100),
+              view.GetInt('HeadlightIntensity', 100))
+    view.SetBool('EnableBacklight', True); view.SetInt('BacklightIntensity', 60); view.SetInt('HeadlightIntensity', 90)
     try:
         board = build_board(); log('board ok')
         fan = build_fan(); log('fan ok')
@@ -658,13 +693,15 @@ def main():
         for r in interference(board, [push, pull, back, cgrp]):
             log('INTERFERENCE %s vs %s: %.2f mm3' % r)
         log('interference check done')
-        shots(doc, cgrp); log('shots done')
         for d in (board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp, mount, tpu, case, doc):
             d.save()
+        shots(doc, cgrp); log('shots done')  # after saving: the render styling stays out of the files
     except Exception:
         log(traceback.format_exc())
     finally:
         prefs.SetBool('CreateBackupFiles', backups)
+        view.SetBool('EnableBacklight', lights[0]); view.SetInt('BacklightIntensity', lights[1])
+        view.SetInt('HeadlightIntensity', lights[2])
         LOG.close()
         os._exit(0)
 

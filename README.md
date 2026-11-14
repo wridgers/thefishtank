@@ -78,7 +78,8 @@ it, so you can tweak values in FreeCAD.
 
 - The BC-250 I/O and M.2 placeholder boxes use dimensions from Fahad_Alduraibi's BC250.scad
   (Printables 1651082, CC BY-SA).
-- The NF-A12x25 model is by djos_1475 (Printables 273355, public domain).
+- The 120 mm fan model, standing in for the ARCTIC P12 Pro, is a Noctua NF-A12x25 by djos_1475
+  (Printables 273355, public domain).
 
 ## Licence
 
