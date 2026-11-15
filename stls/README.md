@@ -1,7 +1,7 @@
 # Printing
 
-An `[a]_` prefix marks an accent-colour part, and `_xN` means print N of it. Everything else
-prints in the primary colour, apart from the TPU parts.
+An `[a]_` prefix shows a part in the accent colour. An `_xN` suffix shows the quantity to print.
+Print the other parts in the primary colour. Print the `tpu_` parts in TPU.
 
 | STL | Qty | Colour / material |
 |---|---|---|
@@ -15,17 +15,19 @@ prints in the primary colour, apart from the TPU parts.
 | `hub_retainer.stl` | 1 | Primary |
 | `tpu_fan_gasket_x5.stl` | 5 | TPU |
 | `tpu_fan_washer_x4.stl` | 4 | TPU |
-| `tpu_foot_short_x4.stl` | 4 | TPU, for standing |
-| `tpu_foot_tall_x4.stl` | 4 | TPU, for lying flat |
+| `tpu_foot_short_x4.stl` | 4 | TPU, for the standing position |
+| `tpu_foot_tall_x4.stl` | 4 | TPU, for the lying position |
 
-- **Orientation.** Print every STL as it is. The case halves stand on their end faces, and
-  the grills print with their outside face on the bed for the smoothest finish.
-- **Material.** The shrouds and clamps sit against the heatsink, so print them in something
-  that copes with heat (PETG, ASA, or ABS), not PLA. PETG or ASA is a good choice for the case.
-- **Size.** The front half prints about 210 mm tall and the back half about 196 mm, on a
-  footprint of about 198 × 125 mm.
-- **Fit.** The grills have 0.3 mm of clearance per side and are glued in. The rear grill
-  spans the seam: glue it into the back half only, so the front half can still slide off.
+- **Orientation.** Print each STL file in the orientation that it has. The case halves stand on
+  their end faces. The grills print with their outer face on the bed. This gives the outer face
+  the smoothest surface.
+- **Material.** The shrouds and the clamps touch the heatsink. Print them in a material that is
+  resistant to heat, for example PETG, ASA, or ABS. Do not use PLA. For the case, use PETG or ASA.
+- **Size.** The front half is approximately 210 mm high. The back half is approximately 196 mm
+  high. Each half has a footprint of approximately 198 × 125 mm.
+- **Fit.** Each grill has 0.3 mm of clearance on each side. Attach the grills with glue. The rear
+  grill goes across the seam. Attach it to the back half only, so that you can remove the front
+  half.
 
-Everything to buy is in [`BOM.md`](../BOM.md), and how to put it together is in
+For the parts to buy, refer to [`BOM.md`](../BOM.md). For the assembly procedure, refer to
 [`ASSEMBLY.md`](ASSEMBLY.md).
