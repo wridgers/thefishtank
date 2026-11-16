@@ -64,10 +64,25 @@ def build_board():
              ('DisplayPort', (-1, 57, 1.6), (14, 16, 7), (0.15, 0.15, 0.15)),
              ('USB_2', (-1, 78, 1.6), (18, 12, 16), (0.20, 0.30, 0.75)),
              ('Buttons', (7, 96, 1.6), (9, 9, 23), (0.90, 0.90, 0.90)),
-             ('M2_Connector', (20.5, 110, 1.6), (22, 6, 8.5), (0.15, 0.15, 0.15))]
+             ('M2_Connector', (20.5, 110, 1.6), (22, 6, 8.5), (0.15, 0.15, 0.15)),
+             # 2x8 pin header J4003 on the power extension, measured on the real board: 5 mm from the
+             # PCB end, 4 mm from the extension's outer edge (y = -22.3), 9 mm high
+             ('J4003_Header', (308 - 5 - 5, -22.3 + 4, 1.6), (5, 20, 9), (0.15, 0.15, 0.15)),
+             # 4 pin fan header CPU_FAN1 beside it, measured: corner 15 mm from the PCB end and 9 mm
+             # from the extension edge, pins 10 mm high
+             ('CPU_FAN1_Header', (308 - 15 - 5.5, -22.3 + 9, 1.6), (5.5, 10, 10), (0.15, 0.15, 0.15)),
+             # 2x9 fine-pitch header TPMS1 near the I/O edge, measured: 15 mm from the I/O edge, 4.5 mm
+             # from the main edge (y = -0.5), 6 mm high
+             ('TPMS1_Header', (15, -0.5 + 4.5, 1.6), (18, 4, 6), (0.15, 0.15, 0.15))]
     for name, p, s, rgb in boxes:
         feature(doc, part, name, Part.makeBox(s[0], s[1], s[2], V(*p)), rgb)
     feature(doc, part, 'M2_Standoff', Part.makeCylinder(2.5, 7, V(31, 34.5, 1.6)), (0.8, 0.7, 0.3))
+    # surface-mount parts behind the I/O connectors (not in the STEP), up to 2 mm high: a slab from the
+    # connectors to the heatsink, 1.5 mm in from the PCB edges, round the parts already modelled
+    smd = Part.makeBox(34, 119.5, 2, V(14, 1.0, 1.6))
+    for o in part.Group:
+        smd = smd.cut(o.Shape)
+    feature(doc, part, 'SMD_Parts', smd.removeSplitter(), (0.10, 0.35, 0.20))
     doc.Comment = ('BC-250 board. PCB/heatsink/backplate/bracket from "Accurate 3D model of the AMD BC-250 board" '
                    'by torassk (Printables 1341336); I/O and M.2 boxes from Fahad_Alduraibi (Printables 1651082).')
     doc.recompute()
@@ -281,7 +296,8 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
     doc.saveAs(os.path.join(CAD, 'fish_tank.FCStd'))  # so links are stored relative
     lay = doc.addObject('Spreadsheet::Sheet', 'Layout')
     rows = [('BoardLength', 308.0, 'PCB length (I/O edge to far edge)'),
-            ('BoardWidth', 122.0, 'PCB width without the power extension'),
+            ('BoardWidth', 122.5, 'PCB width without the power extension'),
+            ('BoardY0', -0.5, 'Y of the PCB main edge (the power extension is beyond it, at -Y)'),
             ('BoardPcbT', 1.6, 'PCB thickness'),
             ('PullEndWallX', 18.0, 'Pull shroud end wall outer face, from the I/O edge (between USB/DP and the M.2 slot)')]
     for i, (a, v, c) in enumerate(rows, start=1):
@@ -334,7 +350,7 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
                 n += 1
                 hy = f'{sgn}{P}ClampHoleOff'
                 link(grp, f'{name}_ClampBar{n}', clamp.getObject('Body'), Rot(V(0, 0, 1), rz),
-                     (P + cx, f'{sgn}({P}PcbW / 2 - {C}ClampReach)', top))
+                     (P + cx, f'{sgn}({P}ClampHoleOff - {C}HoleX)', top))  # bar hole on the block hole
                 link(grp, f'{name}_ClampInsert{n}', insert, flip, (P + cx, hy, P + 'ClampTopZ'))
                 if cx != mount_clamp:
                     link(grp, f'{name}_ClampScrew{n}_M3x10', m3x10, Rot(), (P + cx, hy, f'{top} + {C}BarT'))
@@ -351,13 +367,13 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
     push = side('Push', s_push, flip, f'-1.5 - {tpu.Name}#Params.GasketT', ['ClampX1'], True, 'ClampX1')
     push.Placement = App.Placement(V(0, 0, 0), Rot(V(1, 0, 0), 180))
     push.setExpression('.Placement.Base.x', f'Layout.BoardLength - {s_push.Name}#Params.PcbEndX')
-    push.setExpression('.Placement.Base.y', 'Layout.BoardWidth / 2')
+    push.setExpression('.Placement.Base.y', 'Layout.BoardY0 + Layout.BoardWidth / 2')
     push.setExpression('.Placement.Base.z', f'{s_push.Name}#Params.Height + Layout.BoardPcbT')
     # Pull shroud on the I/O end; fan inlet faces the shroud.
     pull = side('Pull', s_pull, Rot(), f'-24.5 - {tpu.Name}#Params.GasketT', ['ClampX1', 'ClampX2'], False, 'ClampX1')
     pull.Placement = App.Placement(V(0, 0, 0), Rot(V(0, 1, 0), 180))
     pull.setExpression('.Placement.Base.x', f'Layout.PullEndWallX + {s_pull.Name}#Params.XEnd')
-    pull.setExpression('.Placement.Base.y', 'Layout.BoardWidth / 2')
+    pull.setExpression('.Placement.Base.y', 'Layout.BoardY0 + Layout.BoardWidth / 2')
     pull.setExpression('.Placement.Base.z', f'{s_pull.Name}#Params.Height + Layout.BoardPcbT')
 
     # Backplate fan: mount plate (fan face z=0, feet toward +z) standing on the clamp bars of
@@ -380,7 +396,7 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
     push_cx = f'(Layout.BoardLength - {s_push.Name}#Params.PcbEndX + {s_push.Name}#Params.ClampX1)'
     pull_cx = f'(Layout.PullEndWallX + {s_pull.Name}#Params.XEnd - {s_pull.Name}#Params.ClampX1)'
     back.setExpression('.Placement.Base.x', f'({push_cx} + {pull_cx}) / 2')
-    back.setExpression('.Placement.Base.y', 'Layout.BoardWidth / 2')
+    back.setExpression('.Placement.Base.y', 'Layout.BoardY0 + Layout.BoardWidth / 2')
     back.setExpression('.Placement.Base.z', f'-{clamp.Name}#Params.BarT - {M}PlateT - {M}FootH')
     doc.recompute()
     span = (lay.BoardLength - s_push.Params.PcbEndX + s_push.Params.ClampX1) - (lay.PullEndWallX + s_pull.Params.XEnd - s_pull.Params.ClampX1)

@@ -30,7 +30,7 @@ CASE = [
     ('PushFanX', 263.0, 'Push fan centre (X)'),
     ('PullFanX', 79.55, 'Pull fan centre (X)'),
     ('RearFanX', 168.775, 'Backplate fan centre (X)'),
-    ('FanY', 61.0, 'Fan centres (Y)'),
+    ('FanY', 60.75, 'Fan centres (Y): the PCB centre, between its main edges at Y = -0.5 and 122'),
     ('FanHoleSpacing', 105.0, '120 mm fan screw pattern'),
     ('FanOpeningD', 115.0, 'Fan air opening'),
     # --- shell

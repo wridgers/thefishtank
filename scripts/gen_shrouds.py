@@ -14,7 +14,7 @@ COMMON = [
     ('Height', 49.6, 'Fan face (bed, z=0) to PCB seating plane'),
     ('WallT', 4.0, 'Wall thickness'),
     ('FlangeT', 4.0, 'Fan flange plate thickness'),
-    ('PcbW', 122.0, 'BC-250 PCB width (without the power extension)'),
+    ('PcbW', 122.5, 'BC-250 PCB width (without the power extension), from the STEP'),
     ('HeatsinkHalfW', 60.0, 'Largest distance from PCB centreline to a heatsink side (STEP models: 60.0 / 59.5)'),
     ('HeatsinkClear', 0.5, 'Clearance between heatsink sides and the inside of the side walls'),
     ('HalfW', '=HeatsinkHalfW + HeatsinkClear + WallT', 'Half of outer width across the side walls (Y)'),
@@ -31,7 +31,8 @@ COMMON = [
                       'tapers (and its underside ends up shallower than MaxOverhang)'),
     ('PcbT', 1.6, 'BC-250 PCB thickness'),
     ('ClampPreload', 0.2, 'Clamp block top sits this far below PCB top'),
-    ('ClampGap', 0.5, 'Clearance between PCB edge and clamp block'),
+    ('ClampGap', 0.5, 'Clearance between the PCB end and the end clamp block'),
+    ('ClampSideGap', 0.05, 'Clearance between each PCB long edge and its side clamp blocks (0.1 mm slack in all)'),
     ('ClampBlock', 9.0, 'Clamp block depth (perpendicular to PCB edge)'),
     ('ClampW', 9.0, 'Clamp block width (along PCB edge)'),
     ('ClampDrop', 11.0, 'Side clamp block: full-width height below its top'),
@@ -40,8 +41,20 @@ COMMON = [
     ('CornerChamfer', 1.0, 'Chamfer on the outer vertical corners'),
     ('BedChamfer', 0.5, 'Chamfer on edges touching the print bed (elephant foot)'),
     ('ClampTopZ', '=Height + PcbT - ClampPreload', 'Clamp block top'),
-    ('ClampHoleOff', '=PcbW / 2 + ClampGap + ClampBlock / 2', 'Side clamp hole |Y|'),
+    ('ClampHoleOff', '=PcbW / 2 + ClampSideGap + ClampBlock / 2', 'Side clamp hole |Y|'),
     ('ScoopOuterR', '=(ScoopTopZ - ScoopBaseZ) / sin(MaxOverhang)', 'Entry scoop outer radius (derived)'),
+    # zip tie mounts on the outside of both side walls, two per side: a block with a vertical slot (the
+    # print direction, so no bridging) the tie runs through; the cable lies along the wall
+    ('ZipX1', -25.0, 'Zip tie mount 1 position (X)'),
+    ('ZipX2', 25.0, 'Zip tie mount 2 position (X)'),
+    ('ZipTopZ', 20.0, 'Zip tie mount top face (Z); keeps the push shroud mounts clear of the case joint ribs'),
+    ('ZipH', 8.0, 'Zip tie mount: height of its outer face'),
+    ('ZipD', 4.0, 'Zip tie mount: depth out of the wall (45 deg slopes above and below: a trapezium)'),
+    ('ZipW', 10.0, 'Zip tie mount: width along the wall'),
+    ('ZipDip', 0.5, 'Zip tie mount: depth of the dip in the outer face that the cable rests in'),
+    ('ZipDipR', 4.0, 'Zip tie mount: radius of that dip (shallow enough to print: under 45 deg)'),
+    ('ZipSlotW', 4.0, 'Zip tie slot width (ties up to about 3.6 mm)'),
+    ('ZipSlotT', 2.0, 'Zip tie slot thickness, against the wall'),
 ]
 PUSH = COMMON + [
     ('XEntry', -64.65, 'Heatsink entry side outer face (X)'),
@@ -61,6 +74,23 @@ PUSH = COMMON + [
     ('SideNotchX0', -40.0, '+Y wall component notch start'),
     ('SideNotchX1', 38.65, '+Y wall component notch end'),
     ('SideNotchDepth', 4.0, '+Y wall component notch depth'),
+    # J4003, a 2x8 pin header on the PCB power extension (measured on the real board), stands under
+    # the +Y wall at the end: a pocket clears it
+    ('PcbExtW', 21.8, 'PCB power extension: width past the main board edge (+Y side, assembled)'),
+    ('PcbExtEdge', '=PcbW / 2 + PcbExtW', 'Y of the PCB power extension outer edge'),
+    ('HeaderFromEnd', 5.0, 'J4003: distance from the PCB end'),
+    ('HeaderW', 5.0, 'J4003: size along the board (X)'),
+    ('HeaderFromEdge', 4.0, 'J4003: distance from the power extension outer edge'),
+    ('HeaderL', 20.0, 'J4003: length across the board (Y)'),
+    ('HeaderH', 9.0, 'J4003: height above the PCB'),
+    ('HeaderClear', 1.0, 'Clearance round J4003'),
+    # CPU_FAN1, a 4 pin fan header beside J4003 (measured), sits right against the +Y wall's outer
+    # face: a shallow relief in the wall gives its plug room
+    ('FanHdrFromEnd', 15.0, 'CPU_FAN1: distance from the PCB end'),
+    ('FanHdrW', 5.5, 'CPU_FAN1: size along the board (X)'),
+    ('FanPlugH', 16.0, 'CPU_FAN1: height of the plug and its wires to clear, from the PCB'),
+    ('FanReliefD', 1.0, 'CPU_FAN1 relief depth into the +Y wall'),
+    ('FanReliefClear', 1.5, 'CPU_FAN1 relief: extra length past the header at each end'),
 ]
 PULL = COMMON + [
     ('XEntry', -61.55, 'Heatsink entry side outer face (X)'),
@@ -73,13 +103,24 @@ PULL = COMMON + [
     ('ClampX1', -55.0, 'Side clamp 1 position (X)'),
     ('ClampX2', 50.0, 'Side clamp 2 position (X)'),
     ('Notch1Y0', -44.5, 'End wall notch 1 (Ethernet jack)'), ('Notch1Y1', -27.5, ''), ('Notch1Z', 34.6, ''),
-    ('Notch2Y0', -57.5, 'End wall notch 2'), ('Notch2Y1', -52.0, ''), ('Notch2Z', 43.6, ''),
+    # TPMS1, a 2x9 fine-pitch header near the I/O edge (measured on the real board), stands under the
+    # end wall and into the duct: a pocket clears it
+    ('PcbIoX', '=XEnd + 18', 'X of the PCB I/O edge (assembled: the end wall outer face is 18 mm from it)'),
+    ('TpmFromIo', 15.0, 'TPMS1: distance from the PCB I/O edge'),
+    ('TpmL', 18.0, 'TPMS1: length along the board (X)'),
+    ('TpmFromEdge', 4.5, 'TPMS1: distance from the PCB long edge (-Y)'),
+    ('TpmW', 4.0, 'TPMS1: width across the board (Y)'),
+    ('TpmH', 6.0, 'TPMS1: height above the PCB'),
+    ('TpmClear', 1.0, 'Clearance round TPMS1'),
+    # surface-mount parts (not in the STEP) on the PCB under the end wall: up to 2 mm high
+    ('SmdClear', 2.5, 'End wall relief over the PCB between the side walls: 2 mm parts + clearance'),
     ('M2ReliefY0', 48.0, 'Inside relief in end wall for the M.2 connector'), ('M2ReliefY1', 56.0, ''),
     ('M2ReliefZ', 40.1, ''), ('M2ReliefDepth', 2.5, 'Leaves WallT - M2ReliefDepth of wall'),
 ]
 CLAMP = [
     ('ClampBlock', 9.0, 'Must match shroud ClampBlock'),
-    ('ClampGap', 0.5, 'Must match shroud ClampGap'),
+    ('ClampGap', 0.5, 'Must match shroud ClampGap (the end clamp; at the side clamps the tongue reaches '
+                      'ClampGap - ClampSideGap further over the PCB)'),
     ('ClampReach', 4.0, 'How far the tongue overlaps the PCB edge'),
     ('ClampW', 9.0, 'Bar width (must match shroud ClampW)'),
     ('BarT', 4.0, 'Bar thickness over the clamp block'),
@@ -120,7 +161,7 @@ BACKFAN = [
     ('PlateW', 124.0, 'Plate size along the board (X); >= TPU GasketSize'),
     ('PlateT', 4.0, 'Plate thickness'),
     ('FootSpanX', 68.45, 'Foot spacing along the board: pull shroud ClampX1 to push shroud ClampX1 holes, as assembled'),
-    ('FootSpanY', 132.0, 'Foot spacing across the board: 2 * shroud ClampHoleOff'),
+    ('FootSpanY', 131.6, 'Foot spacing across the board: 2 * shroud ClampHoleOff'),
     ('FootSize', 9.0, 'Foot footprint, matches the clamp bar end (ClampBlock x ClampW)'),
     ('FootH', 5.0, 'Foot height above the plate; sets the fan-to-backplate gap (bosses clear the backplate by 1.5)'),
     ('FootHoleD', 3.4, 'M3 clearance'),
@@ -486,9 +527,9 @@ def side_clamps(body, P, xs, start=None):
         far = f'{x} + ClampW / 2'
         s = SK(body, P, f'SideClamp{i}Sketch', 'YZ_Plane', offset=far if start and i == 1 else x)
         # yi is inside the wall, past a corner chamfer, so a block refills the chamfer above its underside;
-        # the block's inner face locates on the PCB edge (PcbW / 2 + ClampGap)
+        # the block's inner face locates on the PCB edge (PcbW / 2 + ClampSideGap)
         # the fence (yo..yf) stands FenceH above the block so the bar can't swing round its screw
-        yi, yl, yo = 'HalfW - CornerChamfer - 0.5', 'PcbW / 2 + ClampGap', 'PcbW / 2 + ClampGap + ClampBlock'
+        yi, yl, yo = 'HalfW - CornerChamfer - 0.5', 'PcbW / 2 + ClampSideGap', 'PcbW / 2 + ClampSideGap + ClampBlock'
         yf = f'{yo} + FenceT'
         zf = 'ClampTopZ - ClampDrop'
         s.polygon([(yi, f'{zf} - ({yf} - ({yi}))'), (yf, zf), (yf, 'ClampTopZ + FenceH'),
@@ -499,6 +540,31 @@ def side_clamps(body, P, xs, start=None):
         else:
             pads.append(feat(body, P, 'Pad', f'SideClamp{i}', s, 'ClampW', SideType='Symmetric'))
     mirror(body, 'SideClampMirror', pads)
+
+
+def zip_tie_mounts(body, P):
+    """Two zip tie mounts on the outside of each side wall (+Y, then mirrored)."""
+    pads = []
+    for i, x in enumerate(('ZipX1', 'ZipX2'), start=1):
+        s = SK(body, P, f'ZipMount{i}Sketch', 'YZ_Plane', offset=x)
+        s.polygon([('HalfW - 0.5', 'ZipTopZ - ZipH - ZipD - 0.5'), ('HalfW + ZipD', 'ZipTopZ - ZipH'),
+                   ('HalfW + ZipD', 'ZipTopZ'), ('HalfW - 0.5', 'ZipTopZ + ZipD + 0.5')])
+        pads.append(feat(body, P, 'Pad', f'ZipMount{i}', s, 'ZipW', SideType='Symmetric'))
+    mirror(body, 'ZipMountMirror', pads)
+    # the dip the cable rests in, along the wall
+    for i, x in enumerate(('ZipX1', 'ZipX2'), start=1):
+        s = SK(body, P, f'ZipDip{i}Sketch', 'YZ_Plane', offset=x)
+        for sy in ('', '-'):
+            g = s.circle((P.py(f'{sy}(HalfW + ZipD + ZipDipR - ZipDip)'), P.py('ZipTopZ - ZipH / 2')), P['ZipDipR'])
+            s.px(g, 3, f'{sy}(HalfW + ZipD + ZipDipR - ZipDip)'); s.py(g, 3, 'ZipTopZ - ZipH / 2')
+            s.dim('Radius', g, expr='ZipDipR')
+        feat(body, P, 'Pocket', f'ZipDip{i}', s, 'ZipW + 2', SideType='Symmetric')
+    # slots, down from above the mounts to just above the flange, beside the wall
+    s = SK(body, P, 'ZipSlotSketch', 'XY_Plane', offset='ZipTopZ + ZipD + 1')
+    for x in ('ZipX1', 'ZipX2'):
+        for y0, y1 in (('HalfW', 'HalfW + ZipSlotT'), ('-HalfW - ZipSlotT', '-HalfW')):
+            s.rect(f'{x} - ZipSlotW / 2', f'{x} + ZipSlotW / 2', y0, y1)
+    feat(body, P, 'Pocket', 'ZipSlots', s, 'ZipTopZ + ZipD + 1 - FlangeT - 0.5')
 
 
 def holes(body, P, name, z, pts, dia, depth):
@@ -537,6 +603,18 @@ def build_push():
     s = SK(body, P, 'SideNotchSketch', 'XZ_Plane', offset='-(HalfW + 1)')
     s.rect('SideNotchX0', 'SideNotchX1', 'Height - SideNotchDepth', 'Height + 5')
     feat(body, P, 'Pocket', 'SideNotch', s, 'WallT + 2', Reversed=True)
+    # J4003 pin header pocket: down from the PCB plane, through the +Y wall into the duct
+    s = SK(body, P, 'HeaderPocketSketch', 'XZ_Plane', offset='-(HalfW + 1)')
+    s.rect('PcbEndX - HeaderFromEnd - HeaderW - HeaderClear', 'PcbEndX - HeaderFromEnd + HeaderClear',
+           'Height - HeaderH - HeaderClear', 'Height + 5')
+    feat(body, P, 'Pocket', 'HeaderPocket', s,
+         'HalfW + 1 - (PcbExtEdge - HeaderFromEdge - HeaderL - HeaderClear)', Reversed=True)
+    # CPU_FAN1 plug relief: FanReliefD into the +Y wall's outer face, down from the PCB plane
+    s = SK(body, P, 'FanReliefSketch', 'XZ_Plane', offset='-(HalfW + 1)')
+    s.rect('PcbEndX - FanHdrFromEnd - FanHdrW - FanReliefClear', 'PcbEndX - FanHdrFromEnd + FanReliefClear',
+           'Height - FanPlugH', 'Height + 5')
+    feat(body, P, 'Pocket', 'FanRelief', s, 'FanReliefD + 1', Reversed=True)
+    zip_tie_mounts(body, P)
     # chamfer the entry corners before the side clamps go on: the clamps (flush with the entry end)
     # fill the chamfer back in above their 45 deg undersides
     shroud_chamfers(body, P)
@@ -588,12 +666,21 @@ def build_pull():
     # component notches in end wall (YZ normal +X; plane at X=XEnd+1, pocket toward -X)
     s = SK(body, P, 'EndNotchSketch', 'YZ_Plane', offset='XEnd + 1')
     s.rect('Notch1Y0', 'Notch1Y1', 'Notch1Z', 'Height + 5')
-    s.rect('Notch2Y0', 'Notch2Y1', 'Notch2Z', 'Height + 5')
     feat(body, P, 'Pocket', 'EndNotches', s, 'WallT + 2')
+    # surface-mount relief: the end wall's PCB edge stands SmdClear off the board between the side walls
+    s = SK(body, P, 'SmdReliefSketch', 'YZ_Plane', offset='XEnd + 1')
+    s.rect('-(HalfW - WallT)', 'HalfW - WallT', 'Height - SmdClear', 'Height + 5')
+    feat(body, P, 'Pocket', 'SmdRelief', s, 'WallT + 2')
+    # TPMS1 pocket: down from the PCB plane, through the end wall and into the duct
+    s = SK(body, P, 'TpmPocketSketch', 'XY_Plane', offset='Height + 5')
+    s.rect('PcbIoX - TpmFromIo - TpmL - TpmClear', 'PcbIoX - TpmFromIo + TpmClear',
+           '-PcbW / 2 + TpmFromEdge - TpmClear', '-PcbW / 2 + TpmFromEdge + TpmW + TpmClear')
+    feat(body, P, 'Pocket', 'TpmPocket', s, 'TpmH + TpmClear + 5')
     s = SK(body, P, 'M2ReliefSketch', 'YZ_Plane', offset='XEnd - WallT')
     s.rect('M2ReliefY0', 'M2ReliefY1', 'M2ReliefZ', 'Height + 5')
     feat(body, P, 'Pocket', 'M2Relief', s, 'M2ReliefDepth', Reversed=True)
     clamp_holes(body, P, [(x, y) for x in ('ClampX1', 'ClampX2') for y in ('ClampHoleOff', '-ClampHoleOff')])
+    zip_tie_mounts(body, P)
     shroud_chamfers(body, P)
     return doc, body
 
