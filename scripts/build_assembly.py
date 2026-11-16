@@ -73,7 +73,10 @@ def build_board():
              ('CPU_FAN1_Header', (308 - 15 - 5.5, -22.3 + 9, 1.6), (5.5, 10, 10), (0.15, 0.15, 0.15)),
              # 2x9 fine-pitch header TPMS1 near the I/O edge, measured: 15 mm from the I/O edge, 4.5 mm
              # from the main edge (y = -0.5), 6 mm high
-             ('TPMS1_Header', (15, -0.5 + 4.5, 1.6), (18, 4, 6), (0.15, 0.15, 0.15))]
+             ('TPMS1_Header', (15, -0.5 + 4.5, 1.6), (18, 4, 6), (0.15, 0.15, 0.15)),
+             # M.2 2280 NVMe SSD, measured: 20 mm from the I/O edge, 6 mm from the y = 122 edge, top 9 mm
+             # above the PCB; modelled from its standoff to its connector, on the standoff (7 mm)
+             ('M2_SSD', (20, 34, 8.6), (22, 76, 2.0), (0.12, 0.12, 0.13))]
     for name, p, s, rgb in boxes:
         feature(doc, part, name, Part.makeBox(s[0], s[1], s[2], V(*p)), rgb)
     feature(doc, part, 'M2_Standoff', Part.makeCylinder(2.5, 7, V(31, 34.5, 1.6)), (0.8, 0.7, 0.3))
@@ -298,8 +301,7 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
     rows = [('BoardLength', 308.0, 'PCB length (I/O edge to far edge)'),
             ('BoardWidth', 122.5, 'PCB width without the power extension'),
             ('BoardY0', -0.5, 'Y of the PCB main edge (the power extension is beyond it, at -Y)'),
-            ('BoardPcbT', 1.6, 'PCB thickness'),
-            ('PullEndWallX', 18.0, 'Pull shroud end wall outer face, from the I/O edge (between USB/DP and the M.2 slot)')]
+            ('BoardPcbT', 1.6, 'PCB thickness')]
     for i, (a, v, c) in enumerate(rows, start=1):
         lay.set(f'A{i}', a); lay.set(f'B{i}', str(v)); lay.setAlias(f'B{i}', a); lay.set(f'C{i}', c)
 
@@ -372,7 +374,7 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
     # Pull shroud on the I/O end; fan inlet faces the shroud.
     pull = side('Pull', s_pull, Rot(), f'-24.5 - {tpu.Name}#Params.GasketT', ['ClampX1', 'ClampX2'], False, 'ClampX1')
     pull.Placement = App.Placement(V(0, 0, 0), Rot(V(0, 1, 0), 180))
-    pull.setExpression('.Placement.Base.x', f'Layout.PullEndWallX + {s_pull.Name}#Params.XEnd')
+    pull.setExpression('.Placement.Base.x', f'{s_pull.Name}#Params.EndWallX + {s_pull.Name}#Params.XEnd')
     pull.setExpression('.Placement.Base.y', 'Layout.BoardY0 + Layout.BoardWidth / 2')
     pull.setExpression('.Placement.Base.z', f'{s_pull.Name}#Params.Height + Layout.BoardPcbT')
 
@@ -394,12 +396,12 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
         fx, fy = ('' if sx > 0 else '-') + M + 'FootSpanX / 2', ('' if sy > 0 else '-') + M + 'FootSpanY / 2'
         link(back, f'BackFan_FootScrew{i}_M3x20', m3x20, flip, (fx, fy, 0))
     push_cx = f'(Layout.BoardLength - {s_push.Name}#Params.PcbEndX + {s_push.Name}#Params.ClampX1)'
-    pull_cx = f'(Layout.PullEndWallX + {s_pull.Name}#Params.XEnd - {s_pull.Name}#Params.ClampX1)'
+    pull_cx = f'({s_pull.Name}#Params.EndWallX + {s_pull.Name}#Params.XEnd - {s_pull.Name}#Params.ClampX1)'
     back.setExpression('.Placement.Base.x', f'({push_cx} + {pull_cx}) / 2')
     back.setExpression('.Placement.Base.y', 'Layout.BoardY0 + Layout.BoardWidth / 2')
     back.setExpression('.Placement.Base.z', f'-{clamp.Name}#Params.BarT - {M}PlateT - {M}FootH')
     doc.recompute()
-    span = (lay.BoardLength - s_push.Params.PcbEndX + s_push.Params.ClampX1) - (lay.PullEndWallX + s_pull.Params.XEnd - s_pull.Params.ClampX1)
+    span = (lay.BoardLength - s_push.Params.PcbEndX + s_push.Params.ClampX1) - (s_pull.Params.EndWallX + s_pull.Params.XEnd - s_pull.Params.ClampX1)
     log('BackFan foot span X: clamps %.2f, mount FootSpanX %.2f' % (span, mount.Params.FootSpanX))
 
     # Case: halves, glue-in grills, hub retainer, PSU, USB hub and their hardware (case = board frame)

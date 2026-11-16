@@ -94,18 +94,23 @@ PUSH = COMMON + [
 ]
 PULL = COMMON + [
     ('XEntry', -61.55, 'Heatsink entry side outer face (X)'),
-    ('XEnd', 61.55, 'End wall outer face (X)'),
+    ('XEnd', 62.05, 'End wall outer face (X)'),
+    # the end wall stands in the narrow gap between the I/O connectors and the M.2 SSD
+    ('EndWallX', 17.5, 'End wall outer face: distance from the PCB I/O edge'),
+    ('EndWallT', 2.0, 'End wall thickness (0.5 mm clear of the USB/DP connector backs and the SSD)'),
+    ('SsdH', 9.0, 'M.2 SSD: top height above the PCB (measured)'),
+    ('SsdClear', 1.0, 'Clearance between the end-wall scoop and the SSD'),
     ('ScoopBaseZ', 2.1, 'Entry scoop: arc centre height'),
     ('ScoopTopZ', 23.35, 'Entry scoop: tip height (outer surface)'),
     ('HiScoopBaseZ', 17.7, 'End-wall scoop: arc centre / tangent height'),
-    ('HiScoopTopZ', 40.6, 'End-wall scoop: tip height (outer surface)'),
+    ('HiScoopTopZ', '=Height - SsdH - SsdClear', 'End-wall scoop: tip height (outer surface), clear of the SSD'),
     ('HiScoopOuterR', '=(HiScoopTopZ - HiScoopBaseZ) / sin(MaxOverhang)', 'End-wall scoop outer radius (derived)'),
     ('ClampX1', -55.0, 'Side clamp 1 position (X)'),
     ('ClampX2', 50.0, 'Side clamp 2 position (X)'),
     ('Notch1Y0', -44.5, 'End wall notch 1 (Ethernet jack)'), ('Notch1Y1', -27.5, ''), ('Notch1Z', 34.6, ''),
     # TPMS1, a 2x9 fine-pitch header near the I/O edge (measured on the real board), stands under the
     # end wall and into the duct: a pocket clears it
-    ('PcbIoX', '=XEnd + 18', 'X of the PCB I/O edge (assembled: the end wall outer face is 18 mm from it)'),
+    ('PcbIoX', '=XEnd + EndWallX', 'X of the PCB I/O edge'),
     ('TpmFromIo', 15.0, 'TPMS1: distance from the PCB I/O edge'),
     ('TpmL', 18.0, 'TPMS1: length along the board (X)'),
     ('TpmFromEdge', 4.5, 'TPMS1: distance from the PCB long edge (-Y)'),
@@ -114,8 +119,6 @@ PULL = COMMON + [
     ('TpmClear', 1.0, 'Clearance round TPMS1'),
     # surface-mount parts (not in the STEP) on the PCB under the end wall: up to 2 mm high
     ('SmdClear', 2.5, 'End wall relief over the PCB between the side walls: 2 mm parts + clearance'),
-    ('M2ReliefY0', 48.0, 'Inside relief in end wall for the M.2 connector'), ('M2ReliefY1', 56.0, ''),
-    ('M2ReliefZ', 40.1, ''), ('M2ReliefDepth', 2.5, 'Leaves WallT - M2ReliefDepth of wall'),
 ]
 CLAMP = [
     ('ClampBlock', 9.0, 'Must match shroud ClampBlock'),
@@ -605,7 +608,9 @@ def build_push():
     feat(body, P, 'Pocket', 'SideNotch', s, 'WallT + 2', Reversed=True)
     # J4003 pin header pocket: down from the PCB plane, through the +Y wall into the duct
     s = SK(body, P, 'HeaderPocketSketch', 'XZ_Plane', offset='-(HalfW + 1)')
-    s.rect('PcbEndX - HeaderFromEnd - HeaderW - HeaderClear', 'PcbEndX - HeaderFromEnd + HeaderClear',
+    # (its far side lines up with the roof edge, so the two make one face instead of a 0.2 mm jog;
+    # that still clears the header by 0.79 mm)
+    s.rect('PcbEndX - HeaderFromEnd - HeaderW - HeaderClear', 'RoofLandX + ScoopTip * tan(MaxOverhang)',
            'Height - HeaderH - HeaderClear', 'Height + 5')
     feat(body, P, 'Pocket', 'HeaderPocket', s,
          'HalfW + 1 - (PcbExtEdge - HeaderFromEdge - HeaderL - HeaderClear)', Reversed=True)
@@ -634,7 +639,7 @@ def build_pull():
     # (outside arc as before: concentric with a ScoopT-thinner arc tangent to the wall; the inside
     # is a larger arc tangent to the wall at the same height, tapering the scoop to ScoopTip)
     A = P['MaxOverhang']; Ro = P['HiScoopOuterR']; R0 = Ro - P['ScoopT']
-    xe, xi, H, zc = P['XEnd'], P['XEnd'] - P['WallT'], P['Height'], P['HiScoopBaseZ']
+    xe, xi, H, zc = P['XEnd'], P['XEnd'] - P['EndWallT'], P['Height'], P['HiScoopBaseZ']
     C = (xi - R0, zc)
     zw = zc + math.sqrt(Ro ** 2 - R0 ** 2)
     aw = math.degrees(math.acos(R0 / Ro))
@@ -648,13 +653,13 @@ def build_pull():
     Le = s.line(tip(Ro), q)
     Ai = s.arc(Ci, Ri, 0, aq)
     Lw2 = s.line((xi, zc), (xi, 0))
-    s.c('Horizontal', Lb); s.c('PointOnObject', Lb, 1, -1); s.px(Lb, 1, 'XEnd - WallT')
+    s.c('Horizontal', Lb); s.c('PointOnObject', Lb, 1, -1); s.px(Lb, 1, 'XEnd - EndWallT')
     s.co(Lb, 2, Lr, 1); s.c('Vertical', Lr); s.px(Lr, 1, 'XEnd')
     s.co(Lr, 2, Lt, 1); s.c('Horizontal', Lt); s.py(Lt, 1, 'Height')
-    s.co(Lt, 2, Lw1, 1); s.c('Vertical', Lw1); s.px(Lw1, 1, 'XEnd - WallT')
+    s.co(Lt, 2, Lw1, 1); s.c('Vertical', Lw1); s.px(Lw1, 1, 'XEnd - EndWallT')
     s.co(Lw1, 2, Ao, 1)
     s.dim('Radius', Ao, expr='HiScoopOuterR', name='HiScoopOuterR')
-    s.px(Ao, 3, 'XEnd - WallT - (HiScoopOuterR - ScoopT)'); s.py(Ao, 3, 'HiScoopBaseZ')
+    s.px(Ao, 3, 'XEnd - EndWallT - (HiScoopOuterR - ScoopT)'); s.py(Ao, 3, 'HiScoopBaseZ')
     s.py(Ao, 2, 'HiScoopBaseZ + HiScoopOuterR * sin(MaxOverhang)', name='HiScoopOverhang')
     s.py(Ai, 3, 'HiScoopBaseZ')
     s.co(Ao, 2, Le, 1); s.co(Le, 2, Ai, 2); s.c('PointOnObject', Ao, 3, Le)
@@ -666,19 +671,16 @@ def build_pull():
     # component notches in end wall (YZ normal +X; plane at X=XEnd+1, pocket toward -X)
     s = SK(body, P, 'EndNotchSketch', 'YZ_Plane', offset='XEnd + 1')
     s.rect('Notch1Y0', 'Notch1Y1', 'Notch1Z', 'Height + 5')
-    feat(body, P, 'Pocket', 'EndNotches', s, 'WallT + 2')
+    feat(body, P, 'Pocket', 'EndNotches', s, 'EndWallT + 2')
     # surface-mount relief: the end wall's PCB edge stands SmdClear off the board between the side walls
     s = SK(body, P, 'SmdReliefSketch', 'YZ_Plane', offset='XEnd + 1')
     s.rect('-(HalfW - WallT)', 'HalfW - WallT', 'Height - SmdClear', 'Height + 5')
-    feat(body, P, 'Pocket', 'SmdRelief', s, 'WallT + 2')
+    feat(body, P, 'Pocket', 'SmdRelief', s, 'EndWallT + 2')
     # TPMS1 pocket: down from the PCB plane, through the end wall and into the duct
     s = SK(body, P, 'TpmPocketSketch', 'XY_Plane', offset='Height + 5')
     s.rect('PcbIoX - TpmFromIo - TpmL - TpmClear', 'PcbIoX - TpmFromIo + TpmClear',
            '-PcbW / 2 + TpmFromEdge - TpmClear', '-PcbW / 2 + TpmFromEdge + TpmW + TpmClear')
     feat(body, P, 'Pocket', 'TpmPocket', s, 'TpmH + TpmClear + 5')
-    s = SK(body, P, 'M2ReliefSketch', 'YZ_Plane', offset='XEnd - WallT')
-    s.rect('M2ReliefY0', 'M2ReliefY1', 'M2ReliefZ', 'Height + 5')
-    feat(body, P, 'Pocket', 'M2Relief', s, 'M2ReliefDepth', Reversed=True)
     clamp_holes(body, P, [(x, y) for x in ('ClampX1', 'ClampX2') for y in ('ClampHoleOff', '-ClampHoleOff')])
     zip_tie_mounts(body, P)
     shroud_chamfers(body, P)
