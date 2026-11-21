@@ -11,6 +11,7 @@ For the parts to print, refer to [stls/README.md](stls/README.md).
 | 2 | [ARCTIC P12 Pro PWM, 120 x 25 mm fan](https://www.amazon.co.uk/dp/B0DJDC74BP) |
 | 1 | [Anker 4-port USB 3.0 hub, 2 ft cable version (A7516 / A8309)](https://www.amazon.co.uk/dp/B07L32B9C2) |
 | 1 | Enhance ENP-8345L-OVT 450 W modular Flex ATX PSU (165 x 81.5 x 40.5 mm) |
+| 1 | [PWM fan hub, for the three fans](https://www.amazon.co.uk/dp/B086X6WB4F) |
 | 1 | [Right-angle USB-A adapter, for the hub cable](https://www.amazon.co.uk/dp/B0F99CJS12) |
 | 1 | [Thermalright TL-C12015B, 120 x 15 mm slim fan](https://www.amazon.co.uk/dp/B0CBLT3PK7) |
 | 1 | [mosfet.party 16 mm backlit power button with built-in latching adapter](https://mosfet.party/products/adapter-3) |
@@ -19,10 +20,11 @@ For the parts to print, refer to [stls/README.md](stls/README.md).
 
 | Qty | Item |
 |---:|---|
-| 8 | BHCS M3x10 (ISO 7380) |
-| 4 | BHCS M3x20 (ISO 7380) |
+| 6 | BHCS M3x10 (ISO 7380) |
+| 6 | BHCS M3x20 (ISO 7380) |
 | 4 | BHCS M3x25 (ISO 7380) |
 | 2 | FHCS #6-32 x 3/8" (82 deg), for the PSU |
 | 12 | FHCS M3x12 (ISO 10642 / DIN 7991) |
+| 4 | FHCS M3x25 (ISO 10642 / DIN 7991) |
 | 8 | FHCS M3x40 (ISO 10642 / DIN 7991) |
-| 36 | [M3 heat-set insert, Voron spec (M3 x 5 mm OD x 4 mm)](https://jb3d.uk/product/50-threaded-heat-set-inserts-m3-x-d5-0-x-l4-0/) |
+| 40 | [M3 heat-set insert, Voron spec (M3 x 5 mm OD x 4 mm)](https://jb3d.uk/product/50-threaded-heat-set-inserts-m3-x-d5-0-x-l4-0/) |

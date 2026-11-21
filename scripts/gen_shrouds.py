@@ -1,7 +1,7 @@
 # Generates parametric FreeCAD models for the BC-250 push-pull fan shrouds.
 # Run with: GEN_MAIN=shrouds freecadcmd scripts/gen_shrouds.py   (env OUTDIR = project directory;
 # FCStd files go to OUTDIR/cad, printable STLs to OUTDIR/stls with Voron-style names)
-import math, os, re
+import json, math, os, re
 import FreeCAD as App, Part, Sketcher
 
 V = App.Vector
@@ -169,6 +169,21 @@ BACKFAN = [
     ('FootH', 5.0, 'Foot height above the plate; sets the fan-to-backplate gap (bosses clear the backplate by 1.5)'),
     ('FootHoleD', 3.4, 'M3 clearance'),
     ('PlateL', '=FootSpanY + FootSize', 'Plate size across the board (Y)'),
+    # the PWM fan hub hangs under an extension of the plate toward the I/O end (behind the pull shroud),
+    # held by its frame (case doc FanHubFrame), whose legs screw into inserts set through the extension
+    # from the feet side; so the fan hub and its cables go in with the board
+    ('HubPlugRoom', 20.0, 'Room for the fan plugs between the fan hub and the slim fan\'s gasket (PlateW wide)'),
+    ('HubCX', '=-PlateW / 2 - HubPlugRoom - 42 / 2', 'Fan hub centre (X): its 42 mm width, past the gasket and the plug room'),
+    ('HubCY', 0.0, 'Fan hub centre (Y): its long axis is along Y'),
+    ('HubLegU', '=102 / 2 - 6 + (6 + 0.3 + 2 + 8 / 2) * cos(45)', 'Fan hub frame legs from the hub centre along it (Y): must match case FanHubLegU'),
+    ('HubLegV', '=42 / 2 - 6 + (6 + 0.3 + 2 + 8 / 2) * cos(45)', '... and across it (X): must match case FanHubLegV'),
+    ('HubLegD', 8.0, 'Must match case FanHubLegD'), ('HubExtMargin', 3.0, 'Plate extension past the frame legs'),
+    # two more feet hold the extension's end: they stand on the clamp bars of pull shroud ClampX2 and
+    # share their inserts, as the first four share ClampX1's
+    ('Foot2X', '=-FootSpanX / 2 - 105', 'Extension feet (X): pull shroud ClampX2 - ClampX1 = 105 (must match)'),
+    ('HubExtX0', '=Foot2X - FootSize / 2 - 1', 'Plate extension end (X): past the extension feet (and the frame legs)'),
+    ('HubWindowY', 43.0, 'Window in the extension (half width): the fan hub bears on the plate past it, near its ends'),
+    ('HubWindowRim', 10.0, 'Extension rim round the window, at its ends (X)'),
 ]
 
 PYFN = {'sin': lambda d: math.sin(math.radians(d)), 'cos': lambda d: math.cos(math.radians(d)),
@@ -735,11 +750,28 @@ def build_backfan_mount():
         s.rect(f'{x} - FootSize / 2', f'{x} + FootSize / 2', f'{y} - FootSize / 2', f'{y} + FootSize / 2')
     feat(body, P, 'Pad', 'Feet', s, 'PlateT + FootH')
     holes(body, P, 'FootScrew', 'PlateT + FootH', feet, 'FootHoleD', 'PlateT + FootH')
-    w, l = P['PlateW'] / 2, P['PlateL'] / 2
+    # fan hub plate extension, overlapping the plate by 1 mm, with the frame leg inserts through it
+    s = SK(body, P, 'HubPlateSketch', 'XY_Plane')
+    s.rect('HubExtX0', '-PlateW / 2 + 1', '-PlateL / 2', 'PlateL / 2')
+    feat(body, P, 'Pad', 'HubPlate', s, 'PlateT')
+    s = SK(body, P, 'Feet2Sketch', 'XY_Plane')
+    feet2 = [('Foot2X', sy + 'FootSpanY / 2') for sy in ('', '-')]
+    for x, y in feet2:
+        s.rect(f'{x} - FootSize / 2', f'{x} + FootSize / 2', f'{y} - FootSize / 2', f'{y} + FootSize / 2')
+    feat(body, P, 'Pad', 'Feet2', s, 'PlateT + FootH')
+    holes(body, P, 'Foot2Screw', 'PlateT + FootH', feet2, 'FootHoleD', 'PlateT + FootH')
+    legs = [(f'HubCX {sx} HubLegV', f'HubCY {sy} HubLegU') for sx in ('+', '-') for sy in ('+', '-')]
+    holes(body, P, 'HubInsert', 'PlateT', legs, 'InsertD', 'PlateT')
+    s = SK(body, P, 'HubWindowSketch', 'XY_Plane', 'PlateT')
+    s.rect('HubExtX0 + HubWindowRim', '-PlateW / 2 - HubWindowRim', 'HubCY - HubWindowY', 'HubCY + HubWindowY')
+    feat(body, P, 'Pocket', 'HubWindow', s, 'PlateT')
+    w, l, x0 = P['PlateW'] / 2, P['PlateL'] / 2, P['HubExtX0']
+    corners = [(x, y) for x in (w, x0) for y in (l, -l)]
+    on_rim = lambda b: (any(abs(b.XMin - x) < 1e-6 and b.XLength < 1e-6 for x in (w, x0))
+                        or any(abs(b.YMin - y) < 1e-6 and b.YLength < 1e-6 for y in (l, -l)))
     chamfer(body, P, 'EdgeChamfer', 'EdgeChamfer',
-            lambda e: vertical_at([(x, y) for x in (w, -w) for y in (l, -l)])(e) or (
-                at_z(P['PlateT'])(e) and (abs(abs(e.BoundBox.XMin) - w) < 1e-6 and e.BoundBox.XLength < 1e-6
-                                          or abs(abs(e.BoundBox.YMin) - l) < 1e-6 and e.BoundBox.YLength < 1e-6)))
+            lambda e: vertical_at(corners)(e) and e.BoundBox.ZMax <= P['PlateT'] + 1e-6
+            or (at_z(P['PlateT'])(e) and on_rim(e.BoundBox)))
     chamfer(body, P, 'BedChamfer', 'BedChamfer', at_z(0))
     return doc, body
 
@@ -808,7 +840,53 @@ def export_stl(shape, path, max_overhang=65.5):
     ok = bed > 1.0 and over < 0.5
     print(f'  {os.path.basename(path)}: print check: on bed {bed:.0f} mm2, overhang > {max_overhang:g} deg '
           f'{over:.1f} mm2 ok={ok}')
-    return ok
+    return check_lock(sh, path) and ok
+
+
+# Parts that are printed and in use are locked: stls/locked.json holds a fingerprint of each one's
+# exact (B-rep) shape, and a build that changes a locked part fails. Accept a change with
+# `make relock` (LOCK_UPDATE=all) or lock more parts with `make relock PARTS=a.stl,b.stl`.
+LOCK_TOL = {'volume': 1e-6, 'area': 1e-6, 'moments': 1e-6}  # relative; lengths are within 0.001 mm
+
+
+def fingerprint(sh):
+    """Size and shape of a part in print orientation: catches a resized or moved feature, but not a
+    different triangulation of the same shape."""
+    vol = sum(s.Volume for s in sh.Solids)
+    com = sum((s.CenterOfMass * s.Volume for s in sh.Solids), V(0, 0, 0)) * (1 / vol)
+    moments = sorted(m for s in sh.Solids for m in s.PrincipalProperties['Moments'])
+    b = sh.BoundBox
+    return {'volume': round(vol, 4), 'area': round(sh.Area, 4), 'size': [round(v, 4) for v in (b.XLength, b.YLength, b.ZLength)],
+            'center_of_mass': [round(v, 4) for v in (com.x, com.y, com.z)], 'moments': [round(m, 2) for m in moments]}
+
+
+def check_lock(sh, path):
+    name = os.path.basename(path)
+    lock_path = os.path.join(os.path.dirname(path), 'locked.json')
+    locked = json.load(open(lock_path)) if os.path.exists(lock_path) else {}
+    fp = fingerprint(sh)
+    update = os.environ.get('LOCK_UPDATE', '')
+    if update == 'all' and name in locked or name in update.split(','):
+        locked[name] = fp
+        with open(lock_path, 'w') as f:
+            json.dump(dict(sorted(locked.items())), f, indent=2)
+            f.write('\n')
+        print(f'  {name}: locked')
+        return True
+    if name not in locked:
+        return True
+    ref, bad = locked[name], []
+    for k, v in fp.items():
+        if k in ('size', 'center_of_mass'):
+            if any(abs(a - b) > 1e-3 for a, b in zip(v, ref[k])):
+                bad.append(f'{k} {ref[k]} -> {v}')
+        elif any(abs(a - b) > LOCK_TOL[k] * max(abs(b), 1.0) for a, b in zip(v if isinstance(v, list) else [v],
+                                                                         ref[k] if isinstance(ref[k], list) else [ref[k]])):
+            bad.append(f'{k} {ref[k]} -> {v}')
+    if bad:
+        print(f'  {name}: LOCKED (printed) part changed: {"; ".join(bad)}. To accept it, run '
+              f'make relock PARTS={name} ok=False')
+    return not bad
 
 
 def stl_path(stldir, name, qty, accent=False):

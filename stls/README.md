@@ -13,6 +13,7 @@ Print the other parts in the primary colour. Print the `tpu_` parts in TPU.
 | `backfan_mount.stl` | 1 | Primary |
 | `pcb_clamp_x7.stl` | 7 | Primary |
 | `hub_retainer.stl` | 1 | Primary |
+| `fan_hub_frame.stl` | 1 | Primary |
 | `tpu_fan_gasket_x5.stl` | 5 | TPU |
 | `tpu_fan_washer_x4.stl` | 4 | TPU |
 | `tpu_foot_short_x4.stl` | 4 | TPU, for the standing position |

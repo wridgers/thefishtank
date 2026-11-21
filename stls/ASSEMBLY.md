@@ -12,11 +12,13 @@ the items in [`BOM.md`](../BOM.md).
    1. Install the joint inserts in the tongues of the front half. Install them from the inner face
       of the ribs.
    2. Install the foot inserts from the outer side. Make sure that they are flush with the wall.
+   3. Install the four fan hub inserts in the plate extension of the backplate fan mount, from the
+      side of its feet.
 2. **Front half.**
-   1. Put the hub into its pocket.
-   2. Install the retainer on the hub with its screws.
+   1. Put the USB hub into its pocket.
+   2. Install the retainer on the USB hub with its screws.
    3. Install the power button.
-   4. Put the hub cable along the floor, toward the back.
+   4. Put the USB hub cable along the floor, toward the back.
 3. **Back half.**
    1. Push the PSU against the back wall.
    2. Install the two PSU screws.
@@ -25,6 +27,12 @@ the items in [`BOM.md`](../BOM.md).
    1. Attach the shrouds to the BC-250 with the clamps.
    2. Install the backplate fan mount.
    3. Install the slim fan on the mount.
+   4. Put the fan hub against the plate extension of the mount, between the four fan hub inserts.
+      Put its SATA input toward the edge of the board that has the power extension.
+   5. Put the fan hub frame on the fan hub. Make sure that the fan hub is inside the wall of the frame.
+   6. Install the four FHCS M3x25 through the frame legs into the inserts.
+   7. Connect the slim fan and CPU_FAN1 to the fan hub. Attach the cables to the zip tie mounts on
+      the shrouds.
 5. **Pull fan stack.**
    1. Put the wall gasket, the fan, and the fan gasket against the left wall of the back half.
    2. Push the four FHCS M3x40 through the wall from the outer side.
@@ -35,14 +43,17 @@ the items in [`BOM.md`](../BOM.md).
    2. Make sure that the tab of the I/O bracket goes over its ledge.
    3. Do not tighten the screws yet.
 7. **Cables.**
-   1. Connect the PSU to the board.
-   2. Put the hub cable behind the end wall of the pull shroud.
-   3. Put the hub cable around the I/O bracket and into the I/O recess.
-   4. Connect the hub cable to a rear USB port through the right-angle adapter.
+   1. Connect the PSU to the board and to the SATA input of the fan hub.
+   2. Connect the pull fan to the fan hub.
+   3. Put the USB hub cable behind the end wall of the pull shroud.
+   4. Put the USB hub cable around the I/O bracket and into the I/O recess.
+   5. Connect the USB hub cable to a rear USB port through the right-angle adapter.
 8. **Front half.**
    1. Assemble the push fan stack on its wall. Use the procedure in step 5.
-   2. Move the front half onto the back half. The tongues go into position before the zigzag seam.
-   3. Install the four FHCS M3x12 joint screws.
+   2. Hold the front half near the back half. Connect the push fan to the fan hub.
+   3. Move the front half onto the back half. Keep the cables clear of the seam. The tongues go into
+      position before the zigzag seam.
+   4. Install the four FHCS M3x12 joint screws.
 9. **Tighten.**
    1. Tighten all eight fan screws. This pulls the board against the left wall.
    2. Install the screw of the bracket tab through the access hole in the top.

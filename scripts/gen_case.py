@@ -156,6 +156,24 @@ CASE = [
     ('RetY2', '=HubY0 + HubL - RetScrewInset', 'Retainer screws, top pair (Y)'),
     ('HubRibZA', '=HubZ + HubT / 2 + HubClear + HubRibT / 2', 'Inner rib centre'),
     ('HubRibZB', '=(ZRight + CaseT + HubZ - HubT / 2 - HubClear) / 2', 'Outer rib (on the wall) centre'),
+    # --- PWM fan hub (102 x 42 x 15, 6 mm corners): power and PWM inputs on its ends, fan ports on both
+    # long edges, so it is held by its face and corners only. It hangs under an extension of the backplate
+    # fan mount, held by a printed frame: a plate on its face, a 2 mm wall round its top, and four legs
+    # in the corner zones, each screwed (FHCS M3x25, flush) into an insert in the mount
+    ('FanHubL', 102.0, 'Fan hub length (Y)'), ('FanHubW', 42.0, 'Fan hub width (X)'),
+    ('FanHubH', 15.0, 'Fan hub height off the wall'), ('FanHubR', 6.0, 'Fan hub corner radius'),
+    ('FanHubLipClear', 0.1, 'Frame rim above the fan hub face'),
+    ('FanHubRingT', '=25 - FanHubLipClear - FanHubH - FanHubPlateT', 'Frame plate thickness: an FHCS M3x25 flush in it ends flush with the far side of the mount plate'),
+    ('FanHubWindowInset', 6.0, 'Frame window: inset from the fan hub outline'), ('FanHubWindowR', 8.0, 'Frame window corner radius'),
+    ('FanHubWallT', 2.0, 'Wall round the fan hub top: thickness'), ('FanHubWallH', 2.0, '... and how far it reaches down the fan hub sides'),
+    ('FanHubWallClear', 0.3, 'Wall to fan hub clearance'),
+    ('FanHubLegD', 8.0, 'Frame leg diameter'), ('FanHubCornerR', 7.0, 'Frame plate corners, round about the legs (screw to edge)'),
+    ('FanHubPlateT', 4.0, 'Backplate fan mount plate the legs screw into: must match its PlateT'),
+    # legs on each corner's diagonal, against the wall: inside the corner zones, clear of the ports
+    ('FanHubLegU', '=FanHubL / 2 - FanHubR + (FanHubR + FanHubWallClear + FanHubWallT + FanHubLegD / 2) * cos(45)',
+     'Frame legs from the fan hub centre along it: must match backfan mount HubLegU'),
+    ('FanHubLegV', '=FanHubW / 2 - FanHubR + (FanHubR + FanHubWallClear + FanHubWallT + FanHubLegD / 2) * cos(45)',
+     '... and across it: must match backfan mount HubLegV'),
 ]
 
 
@@ -182,12 +200,12 @@ def hexagon(s, cu, cv, a, tip=None):
 
 
 def teardrop(s, cu, cv, d, tip, psi='45'):
-    """Hole of diameter d with a point toward tip ('+u' or '-u') whose sides touch the circle psi deg
+    """Hole of diameter d with a point toward tip ('+u', '-u', '+v' or '-v') whose sides touch the circle psi deg
     either side of it: prints without support when u is the print's up direction (steepest overhang
     90 - psi; 45 is the usual teardrop)."""
     P = s.P
     cx, cy, r, ps = P.py(cu), P.py(cv), P.py(d) / 2, P.py(psi)
-    th = 0 if tip == '+u' else 180
+    th = {'+u': 0, '+v': 90, '-u': 180, '-v': 270}[tip]
     pt = lambda a, rr=r: (cx + rr * math.cos(math.radians(a)), cy + rr * math.sin(math.radians(a)))
     A = s.arc((cx, cy), r, th + ps, th + 360 - ps)
     T = pt(th, r / math.cos(math.radians(ps)))
@@ -196,7 +214,10 @@ def teardrop(s, cu, cv, d, tip, psi='45'):
     s.c('Tangent', L1, 1, A, 2); s.c('Tangent', L2, 2, A, 1); s.co(L1, 2, L2, 1)
     s.px(A, 3, cu); s.py(A, 3, cv)
     s.dim('Radius', A, expr=f'({d}) / 2')
-    s.px(L1, 2, f'({cu}) {tip[0]} ({d}) / 2 / cos({psi})'); s.py(L1, 2, cv)
+    if tip[1] == 'u':
+        s.px(L1, 2, f'({cu}) {tip[0]} ({d}) / 2 / cos({psi})'); s.py(L1, 2, cv)
+    else:
+        s.px(L1, 2, cu); s.py(L1, 2, f'({cv}) {tip[0]} ({d}) / 2 / cos({psi})')
 
 
 def disc(s, cu, cv, d, tip=None):
@@ -612,6 +633,79 @@ def build_grills(doc, P):
     return fan, rear, vent
 
 
+def rounded_rect(s, P, cx, cy, hl, hw, r):
+    """Rounded rectangle centred on (cx, cy): half length hl (u), half width hw (v), corner radius r."""
+    X, Y, L, W, R = (P.py(e) for e in (cx, cy, hl, hw, r))
+    L1 = s.line((X - L + R, Y - W), (X + L - R, Y - W)); L2 = s.line((X + L, Y - W + R), (X + L, Y + W - R))
+    L3 = s.line((X + L - R, Y + W), (X - L + R, Y + W)); L4 = s.line((X - L, Y + W - R), (X - L, Y - W + R))
+    A = [s.arc((X + sx * (L - R), Y + sy * (W - R)), R, a, a + 90)
+         for sx, sy, a in [(1, -1, -90), (1, 1, 0), (-1, 1, 90), (-1, -1, 180)]]
+    for i, Ln in enumerate((L1, L2, L3, L4)):
+        s.c('Tangent', Ln, 2, A[i], 1); s.c('Tangent', A[i], 2, (L2, L3, L4, L1)[i], 1)
+    s.c('Horizontal', L1); s.c('Horizontal', L3); s.c('Vertical', L2); s.c('Vertical', L4)
+    s.py(L1, 1, f'({cy}) - ({hw})'); s.px(L2, 1, f'({cx}) + ({hl})'); s.py(L3, 1, f'({cy}) + ({hw})')
+    s.px(L4, 1, f'({cx}) - ({hl})'); s.dim('Radius', A[0], expr=r)
+    for a in A[1:]:
+        s.c('Equal', A[0], a)
+
+
+def build_fan_hub_frame(doc, P):
+    """Frame holding the fan hub against the backplate fan mount's plate extension. Modelled in print
+    orientation, outer face on the bed: local x along the fan hub, y across it, z from the frame's outer
+    face toward the plate. Only the plate (on the face) and a 2 mm wall round the top touch the fan hub,
+    so its ports and inputs stay free; the legs stand in the corner zones."""
+    body = doc.addObject('PartDesign::Body', 'FanHubFrame')
+    hl, hw, r = 'FanHubL / 2', 'FanHubW / 2', 'FanHubR'
+    # one plate: a rounded rectangle whose corners round about the legs, with a window over the middle
+    s = sketch(body, P, 'FanHubPlateSketch', 'XY_Plane')
+    rounded_rect(s, P, '0', '0', 'FanHubLegU + FanHubCornerR', 'FanHubLegV + FanHubCornerR', 'FanHubCornerR')
+    rounded_rect(s, P, '0', '0', f'{hl} - FanHubWindowInset', f'{hw} - FanHubWindowInset', 'FanHubWindowR')
+    feat(body, P, 'Pad', 'FanHubPlate', s, 'FanHubRingT')
+    # wall round the fan hub's top: stops it moving, reaching FanHubWallH down its sides
+    c, t = 'FanHubWallClear', 'FanHubWallClear + FanHubWallT'
+    s = sketch(body, P, 'FanHubWallSketch', 'XY_Plane')
+    rounded_rect(s, P, '0', '0', f'{hl} + {t}', f'{hw} + {t}', f'{r} + {t}')
+    rounded_rect(s, P, '0', '0', f'{hl} + {c}', f'{hw} + {c}', f'{r} + {c}')
+    feat(body, P, 'Pad', 'FanHubWall', s, 'FanHubRingT + FanHubLipClear + FanHubWallH')
+    # legs on the corner diagonals, against the wall, out to the mount plate
+    legs = [(sx * P['FanHubLegU'], sy * P['FanHubLegV']) for sx in (1, -1) for sy in (1, -1)]
+    pts = [(f"{'' if x > 0 else '-'}FanHubLegU", f"{'' if y > 0 else '-'}FanHubLegV") for x, y in legs]
+    s = sketch(body, P, 'FanHubLegSketch', 'XY_Plane')
+    cs = []
+    for (x, y), (ex, ey) in zip(legs, pts):
+        g = s.circle((x, y), P['FanHubLegD'] / 2); cs.append(g)
+        s.px(g, 3, ex); s.py(g, 3, ey)
+    s.dim('Diameter', cs[0], expr='FanHubLegD')
+    for g in cs[1:]:
+        s.c('Equal', cs[0], g)
+    feat(body, P, 'Pad', 'FanHubLegs', s, 'FanHubRingT + FanHubLipClear + FanHubH')
+    # screw holes, countersunk flush in the frame face (the bed face: the 90 deg cone prints as is)
+    s = sketch(body, P, 'FanHubHoleSketch', 'XY_Plane')
+    cs = []
+    for (x, y), (ex, ey) in zip(legs, pts):
+        g = s.circle((x, y), P['ClearD'] / 2); cs.append(g)
+        s.px(g, 3, ex); s.py(g, 3, ey)
+    s.dim('Diameter', cs[0], expr='ClearD')
+    for g in cs[1:]:
+        s.c('Equal', cs[0], g)
+    cut_through(body, P, 'FanHubHole', s, '2 * (FanHubRingT + FanHubLipClear + FanHubH) + 2')
+    countersinks(body, P, 'FanHubCsink', 'XY_Plane', '0', pts, 'ClearD')
+
+    # bed chamfer on the bed edges that take it together (greedy, in case OCC can't do some of them)
+    body.Document.recompute()
+    tip, keep = body.Tip.Shape, []
+    csink = lambda e: hasattr(e.Curve, 'Radius') and abs(e.Curve.Radius - P['CsinkD'] / 2) < 0.2  # its cone is the chamfer
+    for e in sorted((e for e in body.Tip.Shape.Edges if at_z(0)(e) and e.Length >= 1.0 and not csink(e)),
+                    key=lambda e: -e.Length):
+        try:
+            if tip.makeChamfer(P['BedChamfer'], keep + [e]).isValid():
+                keep.append(e)
+        except Exception:
+            pass
+    chamfer(body, P, 'BedChamfer', 'BedChamfer', lambda e: any(e.isSame(k) for k in keep))
+    return body
+
+
 def build_retainer(doc, P):
     """Plate across the hub ribs backing the hub over its whole length, screwed into inserts near both
     ends, so pushing a plug into an end port can't pivot the hub. Local x = -Z (board), y = Y, z: 0 on
@@ -770,6 +864,7 @@ def build_case():
     end_face_chamfer(back, P, P['XBack'])
     build_grills(doc, P)
     build_retainer(doc, P)
+    build_fan_hub_frame(doc, P)
     build_foot(doc, P, 'TpuFootShort', 'FootShortH', 'FootShortRecess')
     build_foot(doc, P, 'TpuFootTall', 'FootTallH', 'FootTallRecess')
     finish(doc, P, lat, feet, front, back)
@@ -789,6 +884,7 @@ def print_matrix(name, P):
 PRINT_QTY = {'CaseFront': (1, 'case_front', False), 'CaseBack': (1, 'case_back', False),
              'FanGrill': (2, 'fan_grill', True), 'RearGrill': (1, 'rear_grill', True),
              'TopVentGrill': (2, 'top_vent_grill', True), 'HubRetainer': (1, 'hub_retainer', False),
+             'FanHubFrame': (1, 'fan_hub_frame', False),
              'TpuFootShort': (4, 'tpu_foot_short', False), 'TpuFootTall': (4, 'tpu_foot_tall', False)}
 
 if os.environ.get('GEN_MAIN') == 'case':

@@ -199,6 +199,20 @@ def build_hub():
     return doc
 
 
+def build_fan_hub():
+    # PWM fan hub, 102 x 42 x 15 with 6 mm corners (measured), ports on both long edges. Local frame:
+    # centred on x (length) and y (width), z from its base (0) to its top (15).
+    doc = App.newDocument('fan_hub')
+    part = doc.addObject('App::Part', 'Hub')
+    body = Part.makeBox(102, 42, 15, V(-51, -21, 0))
+    body = body.makeFillet(6, [e for e in body.Edges if abs(e.BoundBox.ZLength - 15) < 1e-6])
+    feature(doc, part, 'Body', body, (0.10, 0.10, 0.11))
+    doc.Comment = 'PWM fan hub (Amazon B086X6WB4F), simplified from its measured size.'
+    doc.recompute()
+    doc.saveAs(os.path.join(CAD, 'fan_hub.FCStd'))
+    return doc
+
+
 def build_button():
     # mosfet.party 16 mm backlit power button (latching adapter built in), simplified from the usual 16 mm
     # anti-vandal pushbutton:
@@ -261,7 +275,7 @@ def build_hardware():
         feature(doc, p, 'Screw', s, (0.10, 0.10, 0.11) if socket else (0.6, 0.6, 0.62))
     for length in (25, 20, 10):
         bhcs(length)
-    for length in (40, 12):  # ISO 10642 M3: head dia 6.72 (theoretical), 90 deg, 2.0 hex socket
+    for length in (40, 25, 12):  # ISO 10642 M3: head dia 6.72 (theoretical), 90 deg, 2.0 hex socket
         fhcs(f'FHCS_M3x{length}', length, 6.72, 90, 3.0, 2.0)
     fhcs('FHCS_6_32x3_8', 9.525, 6.6, 82, 3.5)  # #6-32 x 3/8" flat head (82 deg), for the PSU
     doc.recompute()
@@ -294,7 +308,7 @@ def tidy_printed(name, rgb):
 
 
 # ------------------------------------------------------------------ assembly
-def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp, mount, tpu, case):
+def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pull, clamp, mount, tpu, case):
     doc = App.newDocument('fish_tank')
     doc.saveAs(os.path.join(CAD, 'fish_tank.FCStd'))  # so links are stored relative
     lay = doc.addObject('Spreadsheet::Sheet', 'Layout')
@@ -329,7 +343,7 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
     flip = Rot(V(1, 0, 0), 180)
 
     def side(name, sdoc, fan_rot, fan_z, clamps_side, end_clamp, mount_clamp):
-        # mount_clamp: the side clamp whose screws come from the backplate fan mount instead
+        # mount_clamp: the side clamps (a tuple) whose screws come from the backplate fan mount's feet instead
         P = sdoc.Name + '#Params.'
         C = clamp.Name + '#Params.'
         grp = doc.addObject('App::Part', name)
@@ -354,7 +368,7 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
                 link(grp, f'{name}_ClampBar{n}', clamp.getObject('Body'), Rot(V(0, 0, 1), rz),
                      (P + cx, f'{sgn}({P}ClampHoleOff - {C}HoleX)', top))  # bar hole on the block hole
                 link(grp, f'{name}_ClampInsert{n}', insert, flip, (P + cx, hy, P + 'ClampTopZ'))
-                if cx != mount_clamp:
+                if cx not in mount_clamp:
                     link(grp, f'{name}_ClampScrew{n}_M3x10', m3x10, Rot(), (P + cx, hy, f'{top} + {C}BarT'))
         if end_clamp:
             n += 1
@@ -366,13 +380,13 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
         return grp
 
     # Push shroud on the far (power) end; fan outlet (struts) faces the shroud.
-    push = side('Push', s_push, flip, f'-1.5 - {tpu.Name}#Params.GasketT', ['ClampX1'], True, 'ClampX1')
+    push = side('Push', s_push, flip, f'-1.5 - {tpu.Name}#Params.GasketT', ['ClampX1'], True, ('ClampX1',))
     push.Placement = App.Placement(V(0, 0, 0), Rot(V(1, 0, 0), 180))
     push.setExpression('.Placement.Base.x', f'Layout.BoardLength - {s_push.Name}#Params.PcbEndX')
     push.setExpression('.Placement.Base.y', 'Layout.BoardY0 + Layout.BoardWidth / 2')
     push.setExpression('.Placement.Base.z', f'{s_push.Name}#Params.Height + Layout.BoardPcbT')
     # Pull shroud on the I/O end; fan inlet faces the shroud.
-    pull = side('Pull', s_pull, Rot(), f'-24.5 - {tpu.Name}#Params.GasketT', ['ClampX1', 'ClampX2'], False, 'ClampX1')
+    pull = side('Pull', s_pull, Rot(), f'-24.5 - {tpu.Name}#Params.GasketT', ['ClampX1', 'ClampX2'], False, ('ClampX1', 'ClampX2'))
     pull.Placement = App.Placement(V(0, 0, 0), Rot(V(0, 1, 0), 180))
     pull.setExpression('.Placement.Base.x', f'{s_pull.Name}#Params.EndWallX + {s_pull.Name}#Params.XEnd')
     pull.setExpression('.Placement.Base.y', 'Layout.BoardY0 + Layout.BoardWidth / 2')
@@ -388,6 +402,19 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
     link(back, 'BackFan_Fan', slim.getObject('Fan'), flip, (0, 0, f'-{T}GasketT'))
     h = M + 'FanHoleSpacing / 2'
     far = f'-{T}GasketT - 15'  # slim fan far face
+    # PWM fan hub under the mount's plate extension (its base on the plate, long axis along Y), held by
+    # its frame; the frame legs screw up into inserts set through the plate from the feet side
+    C = case.Name + '#Params.'
+    link(back, 'FanHub', fanhub.getObject('Hub'), Rot(V(1, 1, 0), 180), (M + 'HubCX', M + 'HubCY', 0))
+    frame_face = f'-({C}FanHubH + {C}FanHubLipClear + {C}FanHubRingT)'
+    link(back, 'FanHubFrame', case.getObject('FanHubFrame'), Rot(V(0, 0, 1), 90), (M + 'HubCX', M + 'HubCY', frame_face))
+    m3x25c = hw.getObject('FHCS_M3x25')
+    for sx in ('+', '-'):
+        for sy in ('+', '-'):
+            n = f'{"P" if sx == "+" else "N"}{"P" if sy == "+" else "N"}'
+            x, y = f'{M}HubCX {sx} {M}HubLegV', f'{M}HubCY {sy} {M}HubLegU'
+            link(back, f'FanHubInsert{n}', insert, flip, (x, y, M + 'PlateT'))
+            link(back, f'FanHubScrew{n}_M3x25', m3x25c, flip, (x, y, frame_face))  # flush in the frame face
     for i, (sx, sy) in enumerate([(1, 1), (1, -1), (-1, 1), (-1, -1)], start=1):
         x, y = ('' if sx > 0 else '-') + h, ('' if sy > 0 else '-') + h
         link(back, f'BackFan_FanInsert{i}', insert, Rot(), (x, y, 0))
@@ -395,6 +422,8 @@ def build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp
         link(back, f'BackFan_FanScrew{i}_M3x25', m3x25, flip, (x, y, f'{far} - {T}WasherT'))
         fx, fy = ('' if sx > 0 else '-') + M + 'FootSpanX / 2', ('' if sy > 0 else '-') + M + 'FootSpanY / 2'
         link(back, f'BackFan_FootScrew{i}_M3x20', m3x20, flip, (fx, fy, 0))
+    for i, sy in enumerate(('', '-'), start=5):  # extension feet, on pull shroud ClampX2's bars
+        link(back, f'BackFan_FootScrew{i}_M3x20', m3x20, flip, (M + 'Foot2X', sy + M + 'FootSpanY / 2', 0))
     push_cx = f'(Layout.BoardLength - {s_push.Name}#Params.PcbEndX + {s_push.Name}#Params.ClampX1)'
     pull_cx = f'({s_pull.Name}#Params.EndWallX + {s_pull.Name}#Params.XEnd - {s_pull.Name}#Params.ClampX1)'
     back.setExpression('.Placement.Base.x', f'({push_cx} + {pull_cx}) / 2')
@@ -479,9 +508,11 @@ BUY = {
     ('fan_120x15', 'Fan'): ('Components', 'Thermalright TL-C12015B, 120 x 15 mm slim fan'),
     ('psu_flex_atx', 'PSU'): ('Components', 'Enhance ENP-8345L-OVT 450 W modular Flex ATX PSU (165 x 81.5 x 40.5 mm)'),
     ('usb_hub_anker', 'Hub'): ('Components', 'Anker 4-port USB 3.0 hub, 2 ft cable version (A7516 / A8309)'),
+    ('fan_hub', 'Hub'): ('Components', 'PWM fan hub, for the three fans'),
     ('power_button_16mm', 'Button'): ('Components', 'mosfet.party 16 mm backlit power button with built-in latching adapter'),
     ('hardware_m3', 'Insert_M3x5x4'): ('Hardware', 'M3 heat-set insert, Voron spec (M3 x 5 mm OD x 4 mm)'),
     ('hardware_m3', 'FHCS_M3x40'): ('Hardware', 'FHCS M3x40 (ISO 10642 / DIN 7991)'),
+    ('hardware_m3', 'FHCS_M3x25'): ('Hardware', 'FHCS M3x25 (ISO 10642 / DIN 7991)'),
     ('hardware_m3', 'FHCS_M3x12'): ('Hardware', 'FHCS M3x12 (ISO 10642 / DIN 7991)'),
     ('hardware_m3', 'FHCS_6_32x3_8'): ('Hardware', 'FHCS #6-32 x 3/8" (82 deg), for the PSU'),
     ('hardware_m3', 'BHCS_M3x25'): ('Hardware', 'BHCS M3x25 (ISO 7380)'),
@@ -493,6 +524,7 @@ LINKS = {
     ('fan_120x25', 'Fan'): 'https://www.amazon.co.uk/dp/B0DJDC74BP',
     ('fan_120x15', 'Fan'): 'https://www.amazon.co.uk/dp/B0CBLT3PK7',
     ('usb_hub_anker', 'Hub'): 'https://www.amazon.co.uk/dp/B07L32B9C2',
+    ('fan_hub', 'Hub'): 'https://www.amazon.co.uk/dp/B086X6WB4F',
     ('power_button_16mm', 'Button'): 'https://mosfet.party/products/adapter-3',
     ('hardware_m3', 'Insert_M3x5x4'): 'https://jb3d.uk/product/50-threaded-heat-set-inserts-m3-x-d5-0-x-l4-0/',
 }
@@ -687,7 +719,7 @@ def main():
         board = build_board(); log('board ok')
         fan = build_fan(); log('fan ok')
         slim = build_slim_fan(); log('slim fan ok')
-        psu = build_psu(); hub = build_hub(); button = build_button(); log('psu + hub + button ok')
+        psu = build_psu(); hub = build_hub(); fanhub = build_fan_hub(); button = build_button(); log('psu + hub + button ok')
         hw = build_hardware(); log('hardware ok')
         white, black, blue = (0.93, 0.93, 0.91), (0.11, 0.11, 0.12), (0.09, 0.17, 0.42)  # print colours
         s_push = tidy_printed('fan_shroud_push', white)
@@ -700,9 +732,10 @@ def main():
             color(case.getObject(g), blue)
         for g in ('TpuFootShort', 'TpuFootTall'):
             color(case.getObject(g), (0.20, 0.20, 0.22))  # TPU, like the fan gaskets
+        color(case.getObject('FanHubFrame'), white)  # like the backplate fan mount it hangs from
         case.save()
         log('printed parts ok')
-        doc, asm, brd, push, pull, back, cgrp = build_assembly(board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp,
+        doc, asm, brd, push, pull, back, cgrp = build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pull, clamp,
                                                               mount, tpu, case)
         bom(doc)
         bad = [(o.Name, o.State) for o in doc.Objects if 'Invalid' in o.State or 'Error' in o.State]
@@ -712,7 +745,7 @@ def main():
         for r in interference(board, [push, pull, back, cgrp]):
             log('INTERFERENCE %s vs %s: %.2f mm3' % r)
         log('interference check done')
-        for d in (board, fan, slim, psu, hub, button, hw, s_push, s_pull, clamp, mount, tpu, case, doc):
+        for d in (board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pull, clamp, mount, tpu, case, doc):
             d.save()
         shots(doc, cgrp); log('shots done')  # after saving: the render styling stays out of the files
     except Exception:
