@@ -3,6 +3,15 @@
 The script scripts/build_assembly.py makes this file from the assembly (cad/fish_tank.FCStd).
 For the parts to print, refer to [stls/README.md](stls/README.md).
 
+## Frame
+
+| Qty | Item |
+|---:|---|
+| 3 | 2020 aluminium extrusion, 84 mm (cross rail): both ends tapped M5 |
+| 2 | 2020 aluminium extrusion, 158 mm (back upright): both ends tapped M5, and a 3.4 mm hole through 29 mm from each end (back brace, tab bar) (refer to stls/ASSEMBLY.md) |
+| 2 | 2020 aluminium extrusion, 158 mm (front upright): both ends tapped M5 |
+| 4 | 2020 aluminium extrusion, 367 mm (long rail): blind-joint access holes (refer to stls/ASSEMBLY.md) |
+
 ## Components
 
 | Qty | Item |
@@ -20,11 +29,14 @@ For the parts to print, refer to [stls/README.md](stls/README.md).
 
 | Qty | Item |
 |---:|---|
-| 6 | BHCS M3x10 (ISO 7380) |
-| 6 | BHCS M3x20 (ISO 7380) |
+| 2 | BHCS M3x10 (ISO 7380) |
+| 10 | BHCS M3x20 (ISO 7380) |
 | 4 | BHCS M3x25 (ISO 7380) |
-| 2 | FHCS #6-32 x 3/8" (82 deg), for the PSU |
-| 12 | FHCS M3x12 (ISO 10642 / DIN 7991) |
+| 14 | BHCS M5x10 (ISO 7380), for the blind joints |
+| 4 | FHCS #6-32 x 3/8" (82 deg), for the PSU |
+| 83 | FHCS M3x10 (ISO 10642 / DIN 7991) |
+| 12 | FHCS M3x16 (ISO 10642 / DIN 7991) |
 | 4 | FHCS M3x25 (ISO 10642 / DIN 7991) |
 | 8 | FHCS M3x40 (ISO 10642 / DIN 7991) |
-| 40 | [M3 heat-set insert, Voron spec (M3 x 5 mm OD x 4 mm)](https://jb3d.uk/product/50-threaded-heat-set-inserts-m3-x-d5-0-x-l4-0/) |
+| 85 | M3 drop-in T-nut for 2020 slots |
+| 38 | [M3 heat-set insert (M3 x 5 mm OD x 4 mm)](https://jb3d.uk/product/50-threaded-heat-set-inserts-m3-x-d5-0-x-l4-0/) |

@@ -1,4 +1,5 @@
-# Generates parametric FreeCAD models for the BC-250 push-pull fan shrouds.
+# Generates parametric FreeCAD models for the board module: the BC-250 push-pull fan shrouds, the PCB
+# clamps, the backplate fan mount, the fan hub frame, and the TPU fan gaskets and washers.
 # Run with: GEN_MAIN=shrouds freecadcmd scripts/gen_shrouds.py   (env OUTDIR = project directory;
 # FCStd files go to OUTDIR/cad, printable STLs to OUTDIR/stls with Voron-style names)
 import json, math, os, re
@@ -170,20 +171,46 @@ BACKFAN = [
     ('FootHoleD', 3.4, 'M3 clearance'),
     ('PlateL', '=FootSpanY + FootSize', 'Plate size across the board (Y)'),
     # the PWM fan hub hangs under an extension of the plate toward the I/O end (behind the pull shroud),
-    # held by its frame (case doc FanHubFrame), whose legs screw into inserts set through the extension
+    # held by its frame (fan_hub_frame), whose legs screw into inserts set through the extension
     # from the feet side; so the fan hub and its cables go in with the board
     ('HubPlugRoom', 20.0, 'Room for the fan plugs between the fan hub and the slim fan\'s gasket (PlateW wide)'),
     ('HubCX', '=-PlateW / 2 - HubPlugRoom - 42 / 2', 'Fan hub centre (X): its 42 mm width, past the gasket and the plug room'),
     ('HubCY', 0.0, 'Fan hub centre (Y): its long axis is along Y'),
-    ('HubLegU', '=102 / 2 - 6 + (6 + 0.3 + 2 + 8 / 2) * cos(45)', 'Fan hub frame legs from the hub centre along it (Y): must match case FanHubLegU'),
-    ('HubLegV', '=42 / 2 - 6 + (6 + 0.3 + 2 + 8 / 2) * cos(45)', '... and across it (X): must match case FanHubLegV'),
-    ('HubLegD', 8.0, 'Must match case FanHubLegD'), ('HubExtMargin', 3.0, 'Plate extension past the frame legs'),
+    ('HubLegU', '=102 / 2 - 6 + (6 + 0.3 + 2 + 8 / 2) * cos(45)', 'Fan hub frame legs from the hub centre along it (Y): must match fan_hub_frame FanHubLegU'),
+    ('HubLegV', '=42 / 2 - 6 + (6 + 0.3 + 2 + 8 / 2) * cos(45)', '... and across it (X): must match fan_hub_frame FanHubLegV'),
+    ('HubLegD', 8.0, 'Must match fan_hub_frame FanHubLegD'), ('HubExtMargin', 3.0, 'Plate extension past the frame legs'),
     # two more feet hold the extension's end: they stand on the clamp bars of pull shroud ClampX2 and
     # share their inserts, as the first four share ClampX1's
     ('Foot2X', '=-FootSpanX / 2 - 105', 'Extension feet (X): pull shroud ClampX2 - ClampX1 = 105 (must match)'),
     ('HubExtX0', '=Foot2X - FootSize / 2 - 1', 'Plate extension end (X): past the extension feet (and the frame legs)'),
     ('HubWindowY', 43.0, 'Window in the extension (half width): the fan hub bears on the plate past it, near its ends'),
     ('HubWindowRim', 10.0, 'Extension rim round the window, at its ends (X)'),
+]
+
+# PWM fan hub (102 x 42 x 15, 6 mm corners): power and PWM inputs on its ends, fan ports on both long edges,
+# so it is held by its face and corners only. It hangs under an extension of the backplate fan mount, held by
+# a printed frame: a plate on its face, a 2 mm wall round its top, and four legs in the corner zones, each
+# screwed (FHCS M3x25, flush) into an insert in the mount
+FAN_HUB_FRAME = [
+    ('FanHubL', 102.0, 'Fan hub length (Y)'), ('FanHubW', 42.0, 'Fan hub width (X)'),
+    ('FanHubH', 15.0, 'Fan hub height off the mount plate'), ('FanHubR', 6.0, 'Fan hub corner radius'),
+    ('FanHubLipClear', 0.1, 'Frame rim above the fan hub face'),
+    ('FanHubPlateT', 4.0, 'Backplate fan mount plate the legs screw into: must match its PlateT'),
+    ('FanHubRingT', '=25 - FanHubLipClear - FanHubH - FanHubPlateT', 'Frame plate thickness: an FHCS M3x25 flush in it ends flush with the far side of the mount plate'),
+    ('FanHubWindowInset', 6.0, 'Frame window: inset from the fan hub outline'), ('FanHubWindowR', 8.0, 'Frame window corner radius'),
+    ('FanHubWallT', 2.0, 'Wall round the fan hub top: thickness'), ('FanHubWallH', 2.0, '... and how far it reaches down the fan hub sides'),
+    ('FanHubWallClear', 0.3, 'Wall to fan hub clearance'),
+    ('FanHubLegD', 8.0, 'Frame leg diameter'), ('FanHubCornerR', 7.0, 'Frame plate corners, round about the legs (screw to edge)'),
+    # legs on each corner's diagonal, against the wall: inside the corner zones, clear of the ports
+    ('FanHubLegU', '=FanHubL / 2 - FanHubR + (FanHubR + FanHubWallClear + FanHubWallT + FanHubLegD / 2) * cos(45)',
+     'Frame legs from the fan hub centre along it: must match backfan mount HubLegU'),
+    ('FanHubLegV', '=FanHubW / 2 - FanHubR + (FanHubR + FanHubWallClear + FanHubWallT + FanHubLegD / 2) * cos(45)',
+     '... and across it: must match backfan mount HubLegV'),
+    ('ClearD', 3.4, 'M3 clearance'),
+    ('CsinkD', 6.9, 'M3 countersink diameter at the surface (ISO 10642 head: 6.72 max)'),
+    ('CsinkA', 90.0, 'M3 countersink included angle'),
+    ('CsinkRun', 0.1, 'Cone runs this far (radially) into the hole, so it leaves no ledge'),
+    ('BedChamfer', 0.5, 'Chamfer on edges touching the print bed (elephant foot)'),
 ]
 
 PYFN = {'sin': lambda d: math.sin(math.radians(d)), 'cos': lambda d: math.cos(math.radians(d)),
@@ -604,6 +631,87 @@ def clamp_holes(body, P, pts):
     holes(body, P, 'ClampScrew', 'ClampTopZ', pts, 'ScrewD', 'InsertDepth + 4')
 
 
+def fix_direction(body, f, grow):
+    """Flip f.Reversed if the feature went the wrong way (grow: pad should add volume, pocket remove)."""
+    doc = body.Document
+    doc.recompute()
+    base = f.BaseFeature.Shape.Volume if f.BaseFeature else 0.0
+    good = lambda: (f.Shape.Volume - base > 1e-3) if grow else (base - f.Shape.Volume > 1e-3)
+    if not good():
+        f.Reversed = not f.Reversed
+        doc.recompute()
+    assert good(), f'{f.Name}: no effect either way'
+
+
+def cut_through(body, P, name, s, thickness):
+    """Pocket symmetric about the sketch plane (sketch placed mid-wall)."""
+    return feat(body, P, 'Pocket', name, s, thickness, SideType='Symmetric')
+
+
+def countersinks(body, P, name, plane, face, pts, hole, d='CsinkD', angle='CsinkA'):
+    """Countersinks round the holes (diameter hole) at pts, from the outer face (sketch offset face)
+    down into the hole, so the screw heads sit flush."""
+    s = SK(body, P, name + 'Sketch', plane, face)
+    cs = []
+    for u, v in pts:
+        g = s.circle((P.py(u), P.py(v)), P.py(d) / 2)
+        s.px(g, 3, u); s.py(g, 3, v); cs.append(g)
+    s.dim('Diameter', cs[0], expr=d)
+    for g in cs[1:]:
+        s.c('Equal', cs[0], g)
+    f = feat(body, P, 'Pocket', name, s, f'(({d}) / 2 - ({hole}) / 2 + CsinkRun) / tan(({angle}) / 2)')
+    f.TaperAngle = -P.py(angle) / 2
+    f.setExpression('TaperAngle', P.fc(f'-({angle}) / 2'))
+    fix_direction(body, f, False)
+    return f
+
+
+def teardrop(s, cu, cv, d, tip, psi='45'):
+    """Hole of diameter d with a point toward tip ('+u', '-u', '+v' or '-v') whose sides touch the circle psi deg
+    either side of it: prints without support when u is the print's up direction (steepest overhang
+    90 - psi; 45 is the usual teardrop)."""
+    P = s.P
+    cx, cy, r, ps = P.py(cu), P.py(cv), P.py(d) / 2, P.py(psi)
+    th = {'+u': 0, '+v': 90, '-u': 180, '-v': 270}[tip]
+    pt = lambda a, rr=r: (cx + rr * math.cos(math.radians(a)), cy + rr * math.sin(math.radians(a)))
+    A = s.arc((cx, cy), r, th + ps, th + 360 - ps)
+    T = pt(th, r / math.cos(math.radians(ps)))
+    L1 = s.line(pt(th + 360 - ps), T)
+    L2 = s.line(T, pt(th + ps))
+    s.c('Tangent', L1, 1, A, 2); s.c('Tangent', L2, 2, A, 1); s.co(L1, 2, L2, 1)
+    s.px(A, 3, cu); s.py(A, 3, cv)
+    s.dim('Radius', A, expr=f'({d}) / 2')
+    if tip[1] == 'u':
+        s.px(L1, 2, f'({cu}) {tip[0]} ({d}) / 2 / cos({psi})'); s.py(L1, 2, cv)
+    else:
+        s.px(L1, 2, cu); s.py(L1, 2, f'({cv}) {tip[0]} ({d}) / 2 / cos({psi})')
+
+
+def rounded_rect(s, P, cx, cy, hl, hw, r):
+    """Rounded rectangle centred on (cx, cy): half length hl (u), half width hw (v), corner radius r."""
+    X, Y, L, W, R = (P.py(e) for e in (cx, cy, hl, hw, r))
+    L1 = s.line((X - L + R, Y - W), (X + L - R, Y - W)); L2 = s.line((X + L, Y - W + R), (X + L, Y + W - R))
+    L3 = s.line((X + L - R, Y + W), (X - L + R, Y + W)); L4 = s.line((X - L, Y + W - R), (X - L, Y - W + R))
+    A = [s.arc((X + sx * (L - R), Y + sy * (W - R)), R, a, a + 90)
+         for sx, sy, a in [(1, -1, -90), (1, 1, 0), (-1, 1, 90), (-1, -1, 180)]]
+    for i, Ln in enumerate((L1, L2, L3, L4)):
+        s.c('Tangent', Ln, 2, A[i], 1); s.c('Tangent', A[i], 2, (L2, L3, L4, L1)[i], 1)
+    s.c('Horizontal', L1); s.c('Horizontal', L3); s.c('Vertical', L2); s.c('Vertical', L4)
+    s.py(L1, 1, f'({cy}) - ({hw})'); s.px(L2, 1, f'({cx}) + ({hl})'); s.py(L3, 1, f'({cy}) + ({hw})')
+    s.px(L4, 1, f'({cx}) - ({hl})'); s.dim('Radius', A[0], expr=r)
+    for a in A[1:]:
+        s.c('Equal', A[0], a)
+
+
+def seg_dist(p, a, b):
+    """Distance from point p to the segment a-b (2D)."""
+    ax, ay = b[0] - a[0], b[1] - a[1]
+    if ax == ay == 0:
+        return math.hypot(p[0] - a[0], p[1] - a[1])
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * ax + (p[1] - a[1]) * ay) / (ax * ax + ay * ay)))
+    return math.hypot(p[0] - a[0] - t * ax, p[1] - a[1] - t * ay)
+
+
 def build_push():
     doc, P, body = new_part('fan_shroud_push', PUSH)
     flange_and_fan_bosses(body, P, ('XEntry + ScoopT', 'XEnd', '-HalfW', 'HalfW'))  # the scoop root is the edge
@@ -776,6 +884,63 @@ def build_backfan_mount():
     return doc, body
 
 
+def build_fan_hub_frame():
+    """Frame holding the fan hub against the backplate fan mount's plate extension. Modelled in print
+    orientation, outer face on the bed: local x along the fan hub, y across it, z from the frame's outer
+    face toward the plate. Only the plate (on the face) and a 2 mm wall round the top touch the fan hub,
+    so its ports and inputs stay free; the legs stand in the corner zones."""
+    doc, P, body = new_part('fan_hub_frame', FAN_HUB_FRAME)
+    hl, hw, r = 'FanHubL / 2', 'FanHubW / 2', 'FanHubR'
+    # one plate: a rounded rectangle whose corners round about the legs, with a window over the middle
+    s = SK(body, P, 'FanHubPlateSketch', 'XY_Plane')
+    rounded_rect(s, P, '0', '0', 'FanHubLegU + FanHubCornerR', 'FanHubLegV + FanHubCornerR', 'FanHubCornerR')
+    rounded_rect(s, P, '0', '0', f'{hl} - FanHubWindowInset', f'{hw} - FanHubWindowInset', 'FanHubWindowR')
+    feat(body, P, 'Pad', 'FanHubPlate', s, 'FanHubRingT')
+    # wall round the fan hub's top: stops it moving, reaching FanHubWallH down its sides
+    c, t = 'FanHubWallClear', 'FanHubWallClear + FanHubWallT'
+    s = SK(body, P, 'FanHubWallSketch', 'XY_Plane')
+    rounded_rect(s, P, '0', '0', f'{hl} + {t}', f'{hw} + {t}', f'{r} + {t}')
+    rounded_rect(s, P, '0', '0', f'{hl} + {c}', f'{hw} + {c}', f'{r} + {c}')
+    feat(body, P, 'Pad', 'FanHubWall', s, 'FanHubRingT + FanHubLipClear + FanHubWallH')
+    # legs on the corner diagonals, against the wall, out to the mount plate
+    legs = [(sx * P['FanHubLegU'], sy * P['FanHubLegV']) for sx in (1, -1) for sy in (1, -1)]
+    pts = [(f"{'' if x > 0 else '-'}FanHubLegU", f"{'' if y > 0 else '-'}FanHubLegV") for x, y in legs]
+    s = SK(body, P, 'FanHubLegSketch', 'XY_Plane')
+    cs = []
+    for (x, y), (ex, ey) in zip(legs, pts):
+        g = s.circle((x, y), P['FanHubLegD'] / 2); cs.append(g)
+        s.px(g, 3, ex); s.py(g, 3, ey)
+    s.dim('Diameter', cs[0], expr='FanHubLegD')
+    for g in cs[1:]:
+        s.c('Equal', cs[0], g)
+    feat(body, P, 'Pad', 'FanHubLegs', s, 'FanHubRingT + FanHubLipClear + FanHubH')
+    # screw holes, countersunk flush in the frame face (the bed face: the 90 deg cone prints as is)
+    s = SK(body, P, 'FanHubHoleSketch', 'XY_Plane')
+    cs = []
+    for (x, y), (ex, ey) in zip(legs, pts):
+        g = s.circle((x, y), P['ClearD'] / 2); cs.append(g)
+        s.px(g, 3, ex); s.py(g, 3, ey)
+    s.dim('Diameter', cs[0], expr='ClearD')
+    for g in cs[1:]:
+        s.c('Equal', cs[0], g)
+    cut_through(body, P, 'FanHubHole', s, '2 * (FanHubRingT + FanHubLipClear + FanHubH) + 2')
+    countersinks(body, P, 'FanHubCsink', 'XY_Plane', '0', pts, 'ClearD')
+
+    # bed chamfer on the bed edges that take it together (greedy, in case OCC can't do some of them)
+    body.Document.recompute()
+    tip, keep = body.Tip.Shape, []
+    csink = lambda e: hasattr(e.Curve, 'Radius') and abs(e.Curve.Radius - P['CsinkD'] / 2) < 0.2  # its cone is the chamfer
+    for e in sorted((e for e in body.Tip.Shape.Edges if at_z(0)(e) and e.Length >= 1.0 and not csink(e)),
+                    key=lambda e: -e.Length):
+        try:
+            if tip.makeChamfer(P['BedChamfer'], keep + [e]).isValid():
+                keep.append(e)
+        except Exception:
+            pass
+    chamfer(body, P, 'BedChamfer', 'BedChamfer', lambda e: any(e.isSame(k) for k in keep))
+    return doc, body
+
+
 def build_clamp():
     doc, P, body = new_part('pcb_clamp', CLAMP)
     # Side profile (XZ). x=0 is the tongue tip (over the PCB), x=BarL the outer end that butts
@@ -820,13 +985,15 @@ def check(doc, body):
     return ok
 
 
-def export_stl(shape, path, max_overhang=65.5):
+def export_stl(shape, path, max_overhang=65.5, tight=False):
     """Write shape, already in print orientation, as an STL ready to slice: lowest face on z=0, centred
     on x/y=0. Checks that it has faces on the bed and nothing else facing down steeper than
-    max_overhang from vertical (the 65 deg design limit plus meshing slack)."""
+    max_overhang from vertical (the 65 deg design limit plus meshing slack). tight: place it by the
+    exact bounding box (the default, quick one can be loose on shapes with many faces; the locked
+    parts keep the default, so their fingerprints don't move)."""
     import MeshPart
     sh = shape.copy()
-    b = sh.BoundBox
+    b = sh.optimalBoundingBox() if tight else sh.BoundBox
     sh.translate(V(-b.Center.x, -b.Center.y, -b.ZMin))
     mesh = MeshPart.meshFromShape(Shape=sh, LinearDeflection=0.02, AngularDeflection=0.1)
     bed = over = 0.0
@@ -905,15 +1072,16 @@ PRINT_QTY = {
     'fan_shroud_pull': 1,
     'pcb_clamp': 7,         # one per clamp block: 3 on push shroud, 4 on pull shroud
     'backfan_mount': 1,
+    'fan_hub_frame': 1,
     'tpu_fan_gasket': 5,    # main fans: one each side (shroud and case wall); backplate fan: one
     'tpu_fan_washer': 4,    # under the backplate fan's screw heads (the case screws are countersunk)
 }
 
-if os.environ.get('GEN_MAIN') == 'shrouds':  # (gen_case.py imports this module)
+if os.environ.get('GEN_MAIN') == 'shrouds':  # (gen_frame.py imports this module)
     stldir = os.path.join(OUTDIR, 'stls')
     os.makedirs(stldir, exist_ok=True)
     os.makedirs(CADDIR, exist_ok=True)
-    for build in (build_push, build_pull, build_clamp, build_backfan_mount, build_tpu):
+    for build in (build_push, build_pull, build_clamp, build_backfan_mount, build_fan_hub_frame, build_tpu):
         doc, *bodies = build()
         path = os.path.join(CADDIR, doc.Name + '.FCStd')
         if os.path.exists(path):

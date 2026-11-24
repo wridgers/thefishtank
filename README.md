@@ -1,7 +1,8 @@
 # The Fish Tank
 
-The Fish Tank is a 3D-printed case for the AMD BC-250 board. Use it to make a Linux Steam Machine.
-The name comes from the Cyan Skillfish chip on the board.
+The Fish Tank is a case for the AMD BC-250 board. Use it to make a Linux Steam Machine. It has a
+frame of 2020 aluminium extrusions and 3D-printed panels. The name comes from the Cyan Skillfish
+chip on the board.
 
 | Standing | Lying flat |
 |---|---|
@@ -13,26 +14,28 @@ The name comes from the Cyan Skillfish chip on the board.
 - **Two positions.** The case can stand upright or lie on its right side. Install the TPU feet on
   the bottom or on the right side. When the case lies on its side, the push-pull fans point up.
   The backplate fan then pulls air from below the case.
-- **Appearance.** The long faces and the front have a hex pattern in their surface. The two halves
-  of the case meet along the grooves of the pattern, so you cannot see the joint. The grills attach
-  with glue and have an accent colour. All screws on the outer surface are flush.
+- **Frame.** The frame is a box of 2020 aluminium extrusions with blind joints. The panels and the
+  other printed parts attach to it with screws into T-nuts.
+- **Appearance.** The panels meet at 45° mitres, so the case has sharp square corners. The grills
+  are hex holes in the panels, symmetrical on each panel. The front has a hex pattern in its
+  surface. All screws on the outer surface are flush.
 - **Easy to print.** No part has supports. No overhang is more than 65°. All edges on the print
   bed have chamfers. Each STL file has the correct orientation for printing.
-- **Hard mounting.** M3 screws in heat-set inserts (Voron M3x5x4) hold all the parts. TPU parts
+- **Hard mounting.** M3 screws in heat-set inserts (M3x5x4) or in T-nuts hold all the parts. TPU parts
   isolate the fans.
 
 > [!WARNING]
-> **Work in progress.** Examine the fit of each part before you use this design. The parts are
-> printed, but they are not assembled yet. AI tools helped to write the scripts that make the
-> design. When the design is complete, the documents will have photos and the design will have a
-> 1.0 release.
+> **Work in progress.** Examine the fit of each part before you use this design. The board parts
+> are printed. The enclosure parts are not printed or assembled yet. AI tools helped to write the
+> scripts that make the design. When the design is complete, the documents will have photos and
+> the design will have a 1.0 release.
 
 ## Documentation
 
 - [`BOM.md`](BOM.md): the parts to buy.
 - [`stls/README.md`](stls/README.md): the parts to print, and how to print them.
 - [`stls/ASSEMBLY.md`](stls/ASSEMBLY.md): the assembly procedure (not complete).
-- [`renders/README.md`](renders/README.md): all the renders of the case and its parts.
+- [`renders/README.md`](renders/README.md): all the renders of the case.
 
 ## Building
 
@@ -67,7 +70,8 @@ make clean      # remove all the files that the build makes
 shows the cause.
 - Each body is one valid solid, and its sketches are fully constrained.
 - Each STL file is on the print bed and has no overhang of more than 65°.
-- The hex pattern and the seam cuts remove the correct volume.
+- The hex pattern removes the correct volume.
+- Each part fits on a 250 × 250 mm print bed.
 
 The assembly step also finds the parts that overlap and shows them.
 
@@ -75,11 +79,12 @@ The assembly step also finds the parts that overlap and shows them.
 sketches, so you can change the values in FreeCAD.
 - **Make permanent changes in the scripts.** When `make` runs again, it replaces the files in
   `cad/`.
-- **After a dimension change, run `make` again.** The script calculates the hex pattern and the
-  zigzag seam only when it runs. They do not change when you change the spreadsheet.
+- **After a dimension change, run `make` again.** The spreadsheet controls the board parts and the
+  back brace. The script calculates the other enclosure parts (for example, the panels) only when it
+  runs. They do not change when you change the spreadsheet.
 
-**Locked parts.** Some parts are printed and in use. `stls/locked.json` keeps the size and shape
-of each of these parts. If a change to the scripts changes a locked part, the build stops and
+**Locked parts.** Some parts are printed and in use, and the extrusions are bought. `stls/locked.json`
+keeps the size and shape of each of these parts. If a change to the scripts changes a locked part, the build stops and
 shows the change. This also applies when the part changes because of a shared parameter.
 - To accept the change to a locked part, use `make relock PARTS=<file>.stl`.
 - To accept the changes to all the locked parts, use `make relock`.

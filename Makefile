@@ -1,6 +1,6 @@
-# Builds The Fish Tank: the parametric FreeCAD models (cad/*.FCStd), the print-ready STLs
-# (stls/), the assembly with its interference check, the renders (renders/, with a README
-# showing them), and the BOM (BOM.md).
+# Builds The Fish Tank: the parametric FreeCAD models (cad/*.FCStd), the print-ready STLs (stls/), the
+# assembly with its interference check, the renders (renders/, with a README showing them), and the BOM
+# (BOM.md).
 #
 #   make                  everything
 #   make parts            only the printed parts (no FreeCAD GUI or STEP models needed)
@@ -23,19 +23,18 @@ FAN_STEP ?= cad/step/nf-a12x25.step
 
 # every FreeCAD file lives in cad/ (the generated parts, the reference models and the assembly)
 SHROUD_FCSTD := $(addprefix cad/,fan_shroud_push.FCStd fan_shroud_pull.FCStd pcb_clamp.FCStd \
-                backfan_mount.FCStd fan_isolation_tpu.FCStd)
-CASE_FCSTD := cad/fish_tank_case.FCStd
+                backfan_mount.FCStd fan_hub_frame.FCStd fan_isolation_tpu.FCStd)
+FRAME_FCSTD := cad/fish_tank_frame.FCStd
 ASSEMBLY := cad/fish_tank.FCStd
 RENDERS := $(addprefix renders/,$(addsuffix .png,case_front_left case_back_right case_front case_back \
-           case_left case_right case_bottom asm_iso asm_push_end asm_pull_end asm_back asm_top \
-           lying_front lying_side))
+           case_left case_right lying_front lying_side frame_front_left frame_back_right))
 
 .PHONY: all parts assembly clean relock
 .DELETE_ON_ERROR:
 
 all: parts assembly
 
-parts: $(SHROUD_FCSTD) $(CASE_FCSTD)
+parts: $(SHROUD_FCSTD) $(FRAME_FCSTD)
 
 assembly: $(ASSEMBLY) $(RENDERS) renders/README.md BOM.md
 
@@ -51,25 +50,31 @@ define generate
 	@grep -ao '[^ ]*: valid=.*\|[^ ]*: print check:.*' logs/$(1).log
 endef
 
+# the board module: shrouds, PCB clamps, backplate fan mount, fan hub frame, TPU fan parts
 $(SHROUD_FCSTD) &: scripts/gen_shrouds.py
 	$(call generate,shrouds,scripts/gen_shrouds.py)
 
-# gen_case.py imports its sketch/feature helpers from gen_shrouds.py and the hex pattern from case_pattern.py
-$(CASE_FCSTD) &: scripts/gen_case.py scripts/case_pattern.py scripts/gen_shrouds.py
-	$(call generate,case,scripts/gen_case.py)
+# the enclosure: frame, panels and the other printed parts; gen_frame.py borrows helpers from gen_shrouds.py
+$(FRAME_FCSTD) &: scripts/gen_frame.py scripts/gen_shrouds.py
+	$(call generate,frame,scripts/gen_frame.py)
 
 # The assembly script also writes the reference models into cad/, re-saves the printed parts with
-# their colours, checks every pair of parts for overlaps, and renders the images. It re-saves the
-# part files, which are also its inputs, so its own outputs are touched afterwards to keep make from
-# rerunning it.
-$(ASSEMBLY) $(RENDERS) renders/README.md BOM.md &: scripts/build_assembly.py $(SHROUD_FCSTD) $(CASE_FCSTD) $(BC_STEP) $(FAN_STEP)
+# their colours, checks every pair of parts for overlaps, and writes the BOM. Then the renders: a
+# FreeCAD run per section, from the saved file (see shots_stage). It re-saves the part files, which are
+# also its inputs, so its own outputs are touched afterwards to keep make from rerunning it.
+$(ASSEMBLY) $(RENDERS) renders/README.md BOM.md &: scripts/build_assembly.py $(SHROUD_FCSTD) $(FRAME_FCSTD) $(BC_STEP) $(FAN_STEP)
 	@mkdir -p logs renders
 	OUTDIR=$(CURDIR) BC_STEP=$(abspath $(BC_STEP)) FAN_STEP=$(abspath $(FAN_STEP)) \
 	    SLIM_FAN_STEP=$(if $(SLIM_FAN_STEP),$(abspath $(SLIM_FAN_STEP))) LOG=$(CURDIR)/logs/assembly.log \
-	    SHOTS=$(CURDIR)/renders $(XVFB) $(FREECAD) scripts/build_assembly.py > /dev/null 2>&1
-	@rm -rf scripts/__pycache__
-	@grep -q 'shots done' logs/assembly.log || { cat logs/assembly.log; exit 1; }
+	    $(XVFB) $(FREECAD) scripts/build_assembly.py > /dev/null 2>&1
+	@grep -q 'saved' logs/assembly.log || { cat logs/assembly.log; exit 1; }
 	@grep 'bad objects\|INTERFERENCE\|checking' logs/assembly.log
+	for k in 0 1 2; do \
+	    SECTION=$$k STAGE=shots OUTDIR=$(CURDIR) LOG=$(CURDIR)/logs/shots_$$k.log \
+	        SHOTS=$(CURDIR)/renders $(XVFB) $(FREECAD) scripts/build_assembly.py > /dev/null 2>&1; \
+	    grep -q 'shots done' logs/shots_$$k.log || { cat logs/shots_$$k.log; exit 1; }; \
+	done
+	@rm -rf scripts/__pycache__
 	@touch $(ASSEMBLY) $(RENDERS) renders/README.md BOM.md
 
 $(BC_STEP):
@@ -78,10 +83,10 @@ $(BC_STEP):
 	@exit 1
 
 clean:
-	rm -f $(SHROUD_FCSTD) $(CASE_FCSTD) $(ASSEMBLY) BOM.md
+	rm -f $(SHROUD_FCSTD) $(FRAME_FCSTD) $(ASSEMBLY) BOM.md
 	rm -f $(addprefix cad/,bc250_board.FCStd fan_120x25.FCStd fan_120x15.FCStd psu_flex_atx.FCStd \
 	      usb_hub_anker.FCStd fan_hub.FCStd power_button_16mm.FCStd hardware_m3.FCStd)
-	rm -f stls/*.stl  # keeps stls/README.md
+	rm -f stls/*.stl  # keeps the READMEs and locked.json
 	rm -rf logs renders
 
 # Printed parts in use are locked (stls/locked.json): a build that changes one fails. To accept the

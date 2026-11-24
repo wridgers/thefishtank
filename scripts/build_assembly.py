@@ -1,6 +1,8 @@
-# Builds the assembly of The Fish Tank (the BC-250 push-pull case). Must run inside the FreeCAD GUI (colours, Assembly joints).
-# env: OUTDIR (project folder; the printed-part FCStd files are in its cad/), BC_STEP, FAN_STEP, LOG, SHOTS,
-# optional SLIM_FAN_STEP (a STEP of the 120x15 slim fan; otherwise a model built from its dimensions)
+# Builds the assembly of The Fish Tank (the BC-250 push-pull case), its BOM, and its renders. Must run inside the
+# FreeCAD GUI (colours, Assembly joints).
+# env: OUTDIR (project folder; the printed-part FCStd files are in its cad/), BC_STEP, FAN_STEP, LOG, optional
+# SLIM_FAN_STEP (a STEP of the 120x15 slim fan; otherwise a model built from its dimensions). With STAGE=shots,
+# SECTION=k and SHOTS (the renders folder): render one section of the views from the saved assembly.
 import math, os, re, traceback
 import FreeCAD as App, FreeCADGui as Gui, Part
 from PySide import QtCore, QtGui
@@ -153,27 +155,30 @@ def build_slim_fan():
 
 
 def build_psu():
-    # Enhance ENP-8345L-OVT modular Flex ATX PSU, 165 x 81.5 x 40.5 (no drawing published: AC-face
-    # layout as the Flex ATX FSP drawing). Local frame: x from the AC face (0) to the DC face (165),
-    # y up from the bottom, z across (0..81.5, z=0 is the C14 side). C14 inlet 15 from that side and
-    # 17.5 up; #6-32 holes on the AC face 5.6 from the z=81.5 side; the DC face takes air in (40 mm fan)
-    # and carries the modular sockets, whose plugs are modelled as one block.
+    # Enhance ENP-8345L-OVT modular Flex ATX PSU, 165 x 81.5 x 40.5 (measured 165 x 80 x 40). Local frame: x
+    # from the AC face (0) to the DC face (165), y up from the bottom (the label face, with its vent slots,
+    # on top), z across (0..81.5, z=0 is the C14 side). AC face as measured from a photo with a rule: the C14
+    # inlet on a plate at the lower corner of the C14 side, and a 40 mm fan beside it, blowing out through
+    # the AC face behind a guard. #6-32 holes on the AC face 5.6 from the z=81.5 side (not yet measured), and
+    # two in the lip under the modular sockets on the DC face, 14.5 in from each side and 5.6 up. The
+    # modular sockets (DC face, nearly the full width above the lip) and their plugs are not modelled.
     doc = App.newDocument('psu_flex_atx')
     part = doc.addObject('App::Part', 'PSU')
     L, H, W = 165.0, 40.5, 81.5
     body = Part.makeBox(L, H, W)
     for y in (4.1, 36.1):
         body = body.cut(Part.makeCylinder(1.75, 6, V(0, y, W - 5.6), V(1, 0, 0)))
+    for z in (14.5, W - 14.5):  # the front lip under the modular sockets (from a photo with a rule)
+        body = body.cut(Part.makeCylinder(1.75, 4, V(L - 4, 5.6, z), V(1, 0, 0)))
     feature(doc, part, 'Body', body, (0.18, 0.18, 0.19))
-    c14 = Part.makeBox(3.2, 30.5, 23.5, V(-3.2, 17.5 - 15.25, 15 - 11.75))
-    c14 = c14.cut(Part.makeBox(2.5, 20, 15, V(-3.2, 17.5 - 10, 15 - 7.5)))
+    c14 = Part.makeBox(3.2, 29.5, 26, V(-3.2, 0, 16 - 13))  # plate, proud of the face
+    c14 = c14.cut(Part.makeBox(2.5, 20, 15, V(-3.2, 14.75 - 10, 16 - 7.5)))  # the inlet's socket
     feature(doc, part, 'C14', c14, (0.08, 0.08, 0.08))
-    guard = Part.makeCylinder(20, 0.6, V(L - 0.6, H - 20.35, 34), V(1, 0, 0)).cut(  # flush stamped grille
-        Part.makeCylinder(18.5, 0.6, V(L - 0.6, H - 20.35, 34), V(1, 0, 0)))
-    feature(doc, part, 'FanGuard', guard, (0.55, 0.55, 0.57))
-    feature(doc, part, 'ModularPlugs', Part.makeBox(20, 24, 50, V(L, 10, 6)), (0.05, 0.05, 0.05))
-    doc.Comment = ('Enhance ENP-8345L-OVT modular Flex ATX PSU (165 x 81.5 x 40.5), simplified; AC face as the '
-                   'Flex ATX FSP drawing, modular plugs on the DC face as one block.')
+    guard = Part.makeCylinder(19, 0.6, V(0, 20.25, 58.7), V(1, 0, 0)).cut(  # fan guard, flush in the AC face
+        Part.makeCylinder(17.5, 0.6, V(0, 20.25, 58.7), V(1, 0, 0)))
+    feature(doc, part, 'FanGuard', guard, (0.10, 0.10, 0.11))
+    doc.Comment = ('Enhance ENP-8345L-OVT modular Flex ATX PSU (165 x 81.5 x 40.5), simplified; AC face as measured '
+                   '(C14 inlet and a 40 mm exhaust fan); the modular sockets and plugs are not modelled.')
     doc.recompute()
     doc.saveAs(os.path.join(CAD, 'psu_flex_atx.FCStd'))
     return doc
@@ -275,7 +280,7 @@ def build_hardware():
         feature(doc, p, 'Screw', s, (0.10, 0.10, 0.11) if socket else (0.6, 0.6, 0.62))
     for length in (25, 20, 10):
         bhcs(length)
-    for length in (40, 25, 12):  # ISO 10642 M3: head dia 6.72 (theoretical), 90 deg, 2.0 hex socket
+    for length in (40, 25, 16, 10):  # ISO 10642 M3: head dia 6.72 (theoretical), 90 deg, 2.0 hex socket
         fhcs(f'FHCS_M3x{length}', length, 6.72, 90, 3.0, 2.0)
     fhcs('FHCS_6_32x3_8', 9.525, 6.6, 82, 3.5)  # #6-32 x 3/8" flat head (82 deg), for the PSU
     doc.recompute()
@@ -294,7 +299,7 @@ def tidy_printed(name, rgb):
         body.Visibility = True
         color(body, rgb)
         body.Tip.Visibility = True
-    # Part::Cut chains (the case halves: body -> seam trim -> hex pattern): show only the last cut
+    # Part::Cut chains: show only the last cut
     cuts = [o for o in doc.Objects if o.TypeId == 'Part::Cut']
     for o in cuts:
         o.Base.Visibility = o.Tool.Visibility = False
@@ -308,9 +313,10 @@ def tidy_printed(name, rgb):
 
 
 # ------------------------------------------------------------------ assembly
-def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pull, clamp, mount, tpu, case):
-    doc = App.newDocument('fish_tank')
-    doc.saveAs(os.path.join(CAD, 'fish_tank.FCStd'))  # so links are stored relative
+def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pull, clamp, mount, tpu, hub_frame, frame):
+    name = 'fish_tank'
+    doc = App.newDocument(name)
+    doc.saveAs(os.path.join(CAD, name + '.FCStd'))  # so links are stored relative
     lay = doc.addObject('Spreadsheet::Sheet', 'Layout')
     rows = [('BoardLength', 308.0, 'PCB length (I/O edge to far edge)'),
             ('BoardWidth', 122.5, 'PCB width without the power extension'),
@@ -321,6 +327,7 @@ def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pul
 
     asm = doc.addObject('Assembly::AssemblyObject', 'Assembly')
     asm.Label = 'FishTank'
+    asm.Placement = App.Placement(V(), VIEW_ROT)  # FreeCAD's standard views: Front is the case front, Z up
 
     def link(parent, name, target, rot=Rot(), base=(0, 0, 0)):
         lk = doc.addObject('App::Link', name)
@@ -337,7 +344,7 @@ def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pul
     insert = hw.getObject('Insert_M3x5x4')
     m3x40, m3x25, m3x20 = hw.getObject('FHCS_M3x40'), hw.getObject('BHCS_M3x25'), hw.getObject('BHCS_M3x20')
     m3x10 = hw.getObject('BHCS_M3x10')
-    K = case.Name + '#Params.'
+    F = frame.Name + '#Params.'
     T = tpu.Name + '#Params.'
     far_face = f'-26 - {T}GasketT'  # fan far face (pads compressed to nothing)
     flip = Rot(V(1, 0, 0), 180)
@@ -356,8 +363,8 @@ def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pul
         for i, (sx, sy) in enumerate([(1, 1), (1, -1), (-1, 1), (-1, -1)], start=1):
             x, y = ('' if sx > 0 else '-') + h, ('' if sy > 0 else '-') + h
             link(grp, f'{name}_FanInsert{i}', insert, Rot(), (x, y, 0))
-            # countersunk fan screws, flush with the case wall, through it, the TPU gasket and the fan
-            wall_out = f'{far_face} - {T}GasketT - {K}FanStackClear - {K}CaseT'
+            # countersunk fan screws, flush with the left panel, through it, the TPU gasket and the fan
+            wall_out = f'{far_face} - {T}GasketT - {F}FanStackClear - {F}PanelT'
             link(grp, f'{name}_FanScrew{i}_M3x40', m3x40, flip, (x, y, wall_out))
         n = 0
         top = f'{P}Height + {P}PcbT'
@@ -404,10 +411,10 @@ def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pul
     far = f'-{T}GasketT - 15'  # slim fan far face
     # PWM fan hub under the mount's plate extension (its base on the plate, long axis along Y), held by
     # its frame; the frame legs screw up into inserts set through the plate from the feet side
-    C = case.Name + '#Params.'
+    C = hub_frame.Name + '#Params.'
     link(back, 'FanHub', fanhub.getObject('Hub'), Rot(V(1, 1, 0), 180), (M + 'HubCX', M + 'HubCY', 0))
     frame_face = f'-({C}FanHubH + {C}FanHubLipClear + {C}FanHubRingT)'
-    link(back, 'FanHubFrame', case.getObject('FanHubFrame'), Rot(V(0, 0, 1), 90), (M + 'HubCX', M + 'HubCY', frame_face))
+    link(back, 'FanHubFrame', hub_frame.getObject('Body'), Rot(V(0, 0, 1), 90), (M + 'HubCX', M + 'HubCY', frame_face))
     m3x25c = hw.getObject('FHCS_M3x25')
     for sx in ('+', '-'):
         for sy in ('+', '-'):
@@ -433,59 +440,7 @@ def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pul
     span = (lay.BoardLength - s_push.Params.PcbEndX + s_push.Params.ClampX1) - (s_pull.Params.EndWallX + s_pull.Params.XEnd - s_pull.Params.ClampX1)
     log('BackFan foot span X: clamps %.2f, mount FootSpanX %.2f' % (span, mount.Params.FootSpanX))
 
-    # Case: halves, glue-in grills, hub retainer, PSU, USB hub and their hardware (case = board frame)
-    cgrp = doc.addObject('App::Part', 'Case')
-    asm.addObject(cgrp)
-    link(cgrp, 'CaseFront', case.getObject('CaseFront'))
-    link(cgrp, 'CaseBack', case.getObject('CaseBack'))
-    roty = Rot(V(0, 1, 0), 180)
-    # fan grills point toward the split (their +x): -X for the push fan, +X for the pull fan
-    link(cgrp, 'PushGrill', case.getObject('FanGrill'), roty, (K + 'PushFanX', K + 'FanY', K + 'ZLeft'))
-    link(cgrp, 'PullGrill', case.getObject('FanGrill'), Rot(V(1, 0, 0), 180), (K + 'PullFanX', K + 'FanY', K + 'ZLeft'))
-    link(cgrp, 'RearGrill', case.getObject('RearGrill'), Rot(), (K + 'RearFanX', K + 'FanY', K + 'ZRight'))
-    vent_rot = Rot(V(1, 0, 0), 90)  # grill +x (its point) -> +X, visible face up
-    for n, x, rot in (('Back', 'VentBackX', vent_rot), ('Front', 'VentFrontX', Rot(V(0, 1, 0), 180).multiply(vent_rot))):
-        link(cgrp, f'TopVent{n}', case.getObject('TopVentGrill'), rot, (K + x, K + 'YTop', K + 'VentZ'))
-    link(cgrp, 'HubRetainer', case.getObject('HubRetainer'), Rot(V(0, 1, 0), 90), (f'{K}HubBackX - {K}RetT', 0, 0))
-    link(cgrp, 'PSU', psu.getObject('PSU'), Rot(), (K + 'PsuX0', K + 'PsuY0', K + 'PsuZ0'))
-    link(cgrp, 'PowerButton', button.getObject('Button'), Rot(V(0, 1, 0), 90), (K + 'XFront', K + 'ButtonY', K + 'ButtonZ'))
-    link(cgrp, 'USB_Hub', hub.getObject('Hub'), Rot(V(0, 0, 1), 90),
-         (K + 'HubFaceX', K + 'HubY0', f'{K}HubZ - {K}HubT / 2'))
-    m3x10b, m3x12c = hw.getObject('BHCS_M3x10'), hw.getObject('FHCS_M3x12')
-    down, up = Rot(V(1, 0, 0), 90), Rot(V(1, 0, 0), -90)  # z axis -> -Y / +Y
-    for i in (1, 2):
-        zt, zb = K + f'RibZTop{i}', K + f'RibZBot{i}'
-        # inserts pressed in from the rib's inner face (the screw pulls them against the tongue)
-        rib = f'{K}CaseT + {K}TongueClear + {K}TongueT + {K}RibH'
-        link(cgrp, f'JointInsertTop{i}', insert, up, (K + 'JointX', f'{K}YTop - ({rib})', zt))
-        link(cgrp, f'JointInsertBottom{i}', insert, down, (K + 'JointX', f'{K}YBot + {rib}', zb))
-        link(cgrp, f'JointScrewTop{i}_M3x12', m3x12c, up, (K + 'JointX', K + 'YTop', zt))
-        link(cgrp, f'JointScrewBottom{i}_M3x12', m3x12c, down, (K + 'JointX', K + 'YBot', zb))
-    # feet: inserts in the bottom and the right side; short feet on the bottom (standing, shown) and
-    # tall ones on the right side (lying on that side, hidden; the renders show both)
-    for a in (1, 2):
-        x = K + f'FootX{a}'
-        for b in (1, 2):
-            z, y = K + f'FootBotZ{b}', K + f'FootSideY{b}'
-            link(cgrp, f'FootInsertBot{a}{b}', insert, up, (x, K + 'YBot', z))
-            link(cgrp, f'FootInsertSide{a}{b}', insert, Rot(), (x, y, K + 'ZRight'))
-            link(cgrp, f'StandFoot{a}{b}', case.getObject('TpuFootShort'), up, (x, f'{K}YBot - {K}FootShortH', z))
-            link(cgrp, f'StandFootScrew{a}{b}_M3x12', m3x12c, down,
-                 (x, f'{K}YBot - {K}FootShortH + {K}FootShortRecess', z))
-            for o in (link(cgrp, f'LyingFoot{a}{b}', case.getObject('TpuFootTall'), Rot(), (x, y, f'{K}ZRight - {K}FootTallH')),
-                      link(cgrp, f'LyingFootScrew{a}{b}_M3x12', m3x12c, flip,
-                           (x, y, f'{K}ZRight - {K}FootTallH + {K}FootTallRecess'))):
-                o.Visibility = False
-    link(cgrp, 'TabInsert', insert, down, (K + 'TabX', K + 'TabUnderY', K + 'TabZ'))
-    link(cgrp, 'TabScrew_M3x10', m3x10b, up, (K + 'TabX', f'{K}TabUnderY + 1.1', K + 'TabZ'))
-    for n, z in (('A', 'HubRibZA'), ('B', 'HubRibZB')):
-        for i, y in ((1, 'RetY1'), (2, 'RetY2')):
-            link(cgrp, f'HubInsert{n}{i}', insert, Rot(V(0, 1, 0), 90), (K + 'HubBackX', K + y, K + z))
-            link(cgrp, f'HubScrew{n}{i}_M3x10', m3x10b, Rot(V(0, 1, 0), -90),
-                 (f'{K}HubBackX - {K}RetT', K + y, K + z))
-    for i, y in ((1, 'PsuHoleY1'), (2, 'PsuHoleY2')):
-        link(cgrp, f'PsuScrew{i}', hw.getObject('FHCS_6_32x3_8'), Rot(V(0, 1, 0), -90),
-             (K + 'XBack', f'{K}PsuY0 + {K}{y}', K + 'PsuHoleZ'))
+    cgrp = frame_group(doc, asm, link, frame, psu, hub, button, hw)
     doc.recompute()
 
     import JointObject
@@ -499,6 +454,130 @@ def build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pul
     return doc, asm, brd, push, pull, back, cgrp
 
 
+def frame_group(doc, asm, link, frame, psu, hub, button, hw):
+    """The enclosure: extrusions with blind joints, the printed back braces, the panels
+    and their screws (positions from the frame doc's Fixings), and the PSU, USB hub and power button
+    where the frame puts them (frame doc Params, in the board frame)."""
+    import json
+    F = frame.Name + '#Params.'
+    grp = doc.addObject('App::Part', 'Frame')
+    asm.addObject(grp)
+    h = F + 'ExtW / 2'
+    ys = {'Bot': f'{F}YBotIn + {h}', 'Top': f'{F}YTopIn - {h}'}
+    zs = {'R': f'{F}ZRightIn + {h}', 'L': f'{F}ZLeftIn - {h}'}
+    xs = {'Back': f'{F}XBackIn + {h}', 'Front': f'{F}XFrontIn - {h}'}
+    along_y, along_z = Rot(V(0, 0, 1), 90), Rot(V(0, 1, 0), -90)
+    m5 = frame.getObject('BHCS_M5x10')
+    lip = F + 'SlotLip'
+    # long rails (X), full length
+    for yn, y in ys.items():
+        for zn, z in zs.items():
+            link(grp, f'RailX_{yn}{zn}', frame.getObject('Rail_X'), Rot(), (F + 'XBackIn', y, z))
+    # uprights (Y) between them, each end an M5 into its tapped end, head under the long rail's slot lip
+    for xn, x in xs.items():
+        for zn, z in zs.items():
+            link(grp, f'RailY_{xn}{zn}', frame.getObject('Rail_Y_Back' if xn == 'Back' else 'Rail_Y'), along_y,
+                 (x, f'{F}YBotIn + {F}ExtW', z))
+            link(grp, f'BlindJoint_Y{xn}{zn}Top', m5, Rot(V(1, 0, 0), -90), (x, f'{F}YTopIn - {F}ExtW + {lip}', z))
+            link(grp, f'BlindJoint_Y{xn}{zn}Bot', m5, Rot(V(1, 0, 0), 90), (x, f'{F}YBotIn + {F}ExtW - {lip}', z))
+    # cross rails (Z) between the long rails; the back bottom one is a printed brace instead
+    for xn, yn in (('Back', 'Top'), ('Front', 'Top'), ('Front', 'Bot')):
+        x, y = xs[xn], ys[yn]
+        link(grp, f'RailZ_{xn}{yn}', frame.getObject('Rail_Z'), along_z, (x, y, f'{F}ZRightIn + {F}ExtW'))
+        link(grp, f'BlindJoint_Z{xn}{yn}R', m5, Rot(V(1, 0, 0), 180), (x, y, f'{F}ZRightIn + {F}ExtW - {lip}'))
+        link(grp, f'BlindJoint_Z{xn}{yn}L', m5, Rot(), (x, y, f'{F}ZLeftIn - {F}ExtW + {lip}'))
+    # back braces (modelled lying on their back face: local x -> Z, y -> X, z -> Y), above the PSU and under
+    # the top panel, an M3 at each end through the end wall into a T-nut in the upright's slot
+    brace_rot = App.Rotation(App.Matrix(0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0))
+    m3x10 = hw.getObject('BHCS_M3x10')
+    tnut = frame.getObject('TNut_M3')
+    for n, y0 in (('Bottom', F + 'BraceY0'),):
+        link(grp, f'BackBrace{n}', frame.getObject('BackBrace'), brace_rot,
+             (F + 'XBackIn', y0, f'{F}ZRightIn + {F}ExtW + {F}BraceClear'))
+        bx, by = f'{F}XBackIn + {F}BraceScrewY', f'{y0} + {F}BraceScrewZ'
+        # end screws from outside, through the uprights (head on the outer slot's floor) into the end wall inserts
+        floor = f'{F}ExtW / 2 - 3.9'  # slot floor: 3.9 from the profile centre (profile_2020)
+        link(grp, f'Brace{n}ScrewR_M3x20', hw.getObject('BHCS_M3x20'), Rot(V(1, 0, 0), 180), (bx, by, f'{F}ZRightIn + {floor}'))
+        link(grp, f'Brace{n}ScrewL_M3x20', hw.getObject('BHCS_M3x20'), Rot(), (bx, by, f'{F}ZLeftIn - ({floor})'))
+        ins = f'{F}ExtW + {F}BraceClear + {F}BraceEndT'
+        link(grp, f'Brace{n}InsertR', hw.getObject('Insert_M3x5x4'), Rot(V(1, 0, 0), 180), (bx, by, f'{F}ZRightIn + {ins}'))
+        link(grp, f'Brace{n}InsertL', hw.getObject('Insert_M3x5x4'), Rot(), (bx, by, f'{F}ZLeftIn - ({ins})'))
+    # panels, splice strips and the hub retainer (modelled in the board frame). The panels, with their
+    # splice strips, feet and all their hardware, are a sub-assembly: hide it to see inside.
+    pgrp = doc.addObject('App::Part', 'Panels')
+    grp.addObject(pgrp)
+    for o in frame.Objects:
+        if o.Name.startswith(('Panel', 'Splice')):
+            link(pgrp, o.Name, o)
+        elif o.Name in ('HubCradle', 'TabBar', 'PsuMount'):
+            link(grp, o.Name, o)
+    # their screws: z axis of each screw -> n (its head side)
+    P = frame.getObject('Params')
+    g = lambda n: float(P.get(n))
+    insert = hw.getObject('Insert_M3x5x4')
+    fhcs10, fhcs16 = hw.getObject('FHCS_M3x10'), hw.getObject('FHCS_M3x16')
+    axis = {'X': V(1, 0, 0), 'Y': V(0, 1, 0), 'Z': V(0, 0, 1)}
+
+    def place(name, target, p, zdir, xdir=None, vis=True, parent=grp):
+        zdir = V(*zdir)
+        rot = App.Rotation(V(0, 0, 1), zdir)
+        if xdir is not None:  # T-nut: its long side along the rail
+            y = zdir.cross(xdir)
+            rot = App.Rotation(App.Matrix(xdir.x, y.x, zdir.x, 0, xdir.y, y.y, zdir.y, 0, xdir.z, y.z, zdir.z, 0))
+        lk = link(parent, name, target, rot, (p.x, p.y, p.z))
+        lk.Visibility = vis
+        return lk
+    count = {}
+    for f in json.loads(frame.getObject('Fixings').Data):
+        k = f['kind']
+        count[k] = count.get(k, 0) + 1
+        i = count[k]
+        p, n = V(*f['p']), V(*f['n'])
+        nut_at = p - n * (g('PanelT') + g('SlotLip'))
+        if k == 'panel':
+            place(f'PanelScrew{i}_M3x10', fhcs10, p, n, parent=pgrp)
+            place(f'PanelTNut{i}', tnut, nut_at, n, axis[f['rail']], parent=pgrp)
+        elif k == 'splice':
+            place(f'SpliceScrew{i}_M3x10', fhcs10, p, n, parent=pgrp)
+            place(f'SpliceInsert{i}', insert, p - n * f['far'], n, parent=pgrp)
+        elif k in ('foot_short', 'foot_tall'):
+            short = k == 'foot_short'  # the renders show the case standing: the lying feet are hidden
+            H, rec = (g('FootShortH'), g('FootShortRecess')) if short else (g('FootTallH'), g('FootTallRecess'))
+            foot = frame.getObject('TpuFootShort' if short else 'TpuFootTall')
+            place(f'{"Stand" if short else "Lying"}Foot{i}', foot, p + n * H, -n, vis=short, parent=pgrp)
+            place(f'{"Stand" if short else "Lying"}FootScrew{i}_M3x16', fhcs16, p + n * (H - rec), n, vis=short,
+                  parent=pgrp)
+            place(f'{"Stand" if short else "Lying"}FootTNut{i}', tnut, nut_at, n, axis[f['rail']], vis=short,
+                  parent=pgrp)
+        elif k == 'psu_front':  # PSU front mount: into the PSU's front lip, and into the bottom long rails
+            place(f'PsuFrontScrew{i}', hw.getObject('FHCS_6_32x3_8'), p, n)
+        elif k == 'psu_rail':
+            place(f'PsuMountScrew{i}_M3x16', fhcs16, p, n)
+            place(f'PsuMountTNut{i}', tnut, V(*f['nut']), n, axis[f['rail']])
+        elif k == 'psu':
+            place(f'PsuScrew{i}', hw.getObject('FHCS_6_32x3_8'), p, n)
+        elif k == 'hub_rail':  # the USB hub cradle, on the front right upright's back slot
+            place(f'HubCradleScrew{i}_M3x16', fhcs16, p, n)
+            place(f'HubCradleTNut{i}', tnut, V(*f['nut']), n, axis[f['rail']])
+    # the tab bar's end screws, from outside the back uprights (as the back brace's)
+    floor = f'{F}ExtW / 2 - 3.9'
+    ty, tx = F + 'TabBarScrewY', f'{F}XBackIn + {F}SlotC'
+    link(grp, 'TabBarScrewR_M3x20', hw.getObject('BHCS_M3x20'), Rot(V(1, 0, 0), 180), (tx, ty, f'{F}ZRightIn + {floor}'))
+    link(grp, 'TabBarScrewL_M3x20', hw.getObject('BHCS_M3x20'), Rot(), (tx, ty, f'{F}ZLeftIn - ({floor})'))
+    ins = f'{F}ExtW + {F}BraceClear + {F}BraceEndT'
+    link(grp, 'TabBarInsertR', insert, Rot(V(1, 0, 0), 180), (tx, ty, f'{F}ZRightIn + {ins}'))
+    link(grp, 'TabBarInsertL', insert, Rot(), (tx, ty, f'{F}ZLeftIn - ({ins})'))
+    # the I/O bracket tab: insert in the tab bar, screw from above (before the top back cross rail goes in)
+    link(grp, 'TabInsert', insert, Rot(V(1, 0, 0), 90), (F + 'TabX', F + 'TabUnderY', F + 'TabZ'))
+    link(grp, 'TabScrew_M3x10', m3x10, Rot(V(1, 0, 0), -90), (F + 'TabX', f'{F}TabUnderY + 1.1', F + 'TabZ'))
+    # PSU, USB hub and power button
+    link(grp, 'PSU', psu.getObject('PSU'), Rot(), (F + 'PsuX0', F + 'PsuY0', F + 'PsuZ0'))
+    link(grp, 'USB_Hub', hub.getObject('Hub'), Rot(V(0, 0, 1), 90), (F + 'HubFaceX', F + 'HubY0', f'{F}HubZ - {F}HubT / 2'))
+    link(grp, 'PowerButton', button.getObject('Button'), Rot(V(0, 1, 0), 90),
+         (f'{F}XFrontIn + {F}PanelT', F + 'ButtonY', F + 'ButtonZ'))
+    return grp
+
+
 # ------------------------------------------------------------------ bill of materials
 # Everything to buy, keyed by the object the assembly links to: (document, object) -> (group, item).
 # Printed parts (stls/) aren't listed.
@@ -510,10 +589,11 @@ BUY = {
     ('usb_hub_anker', 'Hub'): ('Components', 'Anker 4-port USB 3.0 hub, 2 ft cable version (A7516 / A8309)'),
     ('fan_hub', 'Hub'): ('Components', 'PWM fan hub, for the three fans'),
     ('power_button_16mm', 'Button'): ('Components', 'mosfet.party 16 mm backlit power button with built-in latching adapter'),
-    ('hardware_m3', 'Insert_M3x5x4'): ('Hardware', 'M3 heat-set insert, Voron spec (M3 x 5 mm OD x 4 mm)'),
+    ('hardware_m3', 'Insert_M3x5x4'): ('Hardware', 'M3 heat-set insert (M3 x 5 mm OD x 4 mm)'),
     ('hardware_m3', 'FHCS_M3x40'): ('Hardware', 'FHCS M3x40 (ISO 10642 / DIN 7991)'),
     ('hardware_m3', 'FHCS_M3x25'): ('Hardware', 'FHCS M3x25 (ISO 10642 / DIN 7991)'),
-    ('hardware_m3', 'FHCS_M3x12'): ('Hardware', 'FHCS M3x12 (ISO 10642 / DIN 7991)'),
+    ('hardware_m3', 'FHCS_M3x16'): ('Hardware', 'FHCS M3x16 (ISO 10642 / DIN 7991)'),
+    ('hardware_m3', 'FHCS_M3x10'): ('Hardware', 'FHCS M3x10 (ISO 10642 / DIN 7991)'),
     ('hardware_m3', 'FHCS_6_32x3_8'): ('Hardware', 'FHCS #6-32 x 3/8" (82 deg), for the PSU'),
     ('hardware_m3', 'BHCS_M3x25'): ('Hardware', 'BHCS M3x25 (ISO 7380)'),
     ('hardware_m3', 'BHCS_M3x20'): ('Hardware', 'BHCS M3x20 (ISO 7380)'),
@@ -528,6 +608,18 @@ LINKS = {
     ('power_button_16mm', 'Button'): 'https://mosfet.party/products/adapter-3',
     ('hardware_m3', 'Insert_M3x5x4'): 'https://jb3d.uk/product/50-threaded-heat-set-inserts-m3-x-d5-0-x-l4-0/',
 }
+# the frame's bought parts ({L}: the rail's length, from its model)
+BUY.update({
+    ('fish_tank_frame', 'Rail_X'): ('Frame', '2020 aluminium extrusion, {L} mm (long rail): blind-joint access holes '
+                                               '(refer to stls/ASSEMBLY.md)'),
+    ('fish_tank_frame', 'Rail_Y'): ('Frame', '2020 aluminium extrusion, {L} mm (front upright): both ends tapped M5'),
+    ('fish_tank_frame', 'Rail_Y_Back'): ('Frame', '2020 aluminium extrusion, {L} mm (back upright): both ends tapped '
+                                                  'M5, and a 3.4 mm hole through 29 mm from each end (back brace, tab bar) '
+                                                  '(refer to stls/ASSEMBLY.md)'),
+    ('fish_tank_frame', 'Rail_Z'): ('Frame', '2020 aluminium extrusion, {L} mm (cross rail): both ends tapped M5'),
+    ('fish_tank_frame', 'BHCS_M5x10'): ('Hardware', 'BHCS M5x10 (ISO 7380), for the blind joints'),
+    ('fish_tank_frame', 'TNut_M3'): ('Hardware', 'M3 drop-in T-nut for 2020 slots'),
+})
 # Bought but not modelled in the assembly: (group, item, qty, link).
 UNMODELLED = [
     ('Components', 'Right-angle USB-A adapter, for the hub cable', 1, 'https://www.amazon.co.uk/dp/B0F99CJS12'),
@@ -536,7 +628,7 @@ UNMODELLED = [
 
 def bom(doc):
     """Count the bought parts linked into the assembly; write them to a BOM sheet and BOM.md."""
-    count = {}
+    count, lengths = {}, {}
     for o in doc.Objects:
         if o.TypeId != 'App::Link':
             continue
@@ -544,10 +636,12 @@ def bom(doc):
         key = (t.Document.Name, t.Name)
         if key in BUY:
             count[key] = count.get(key, 0) + 1
+            lengths[key] = t.Shape.BoundBox.XLength
         elif key[0] == 'hardware_m3':
             raise KeyError(f'{o.Name}: {key} missing from BUY')
     natural = lambda s: [int(t) if t.isdigit() else t for t in re.split(r'(\d+)', s)]  # M3x8 before M3x10
-    rows = sorted([(BUY[k][0], BUY[k][1], n, LINKS.get(k)) for k, n in count.items()] + UNMODELLED,
+    rows = sorted([(BUY[k][0], BUY[k][1].format(L=f'{lengths[k]:g}'), n, LINKS.get(k)) for k, n in count.items()]
+                  + UNMODELLED,
                   key=lambda r: (r[0], natural(r[1])))
     sheet = doc.addObject('Spreadsheet::Sheet', 'BOM')
     for c, h in zip('ABC', ('Qty', 'Item', 'Group')):
@@ -555,21 +649,30 @@ def bom(doc):
     for i, (group, item, n, _) in enumerate(rows, start=2):
         sheet.set(f'A{i}', str(n)); sheet.set(f'B{i}', item); sheet.set(f'C{i}', group)
     sheet.setColumnWidth('B', 520)
-    lines = ['# The Fish Tank: parts to buy', '',
-             'The script scripts/build_assembly.py makes this file from the assembly (cad/fish_tank.FCStd).',
-             'For the parts to print, refer to [stls/README.md](stls/README.md).', '']
-    for group in ('Components', 'Hardware'):
+    out, lines = 'BOM.md', ['# The Fish Tank: parts to buy', '',
+                            'The script scripts/build_assembly.py makes this file from the assembly (cad/fish_tank.FCStd).',
+                            'For the parts to print, refer to [stls/README.md](stls/README.md).', '']
+    for group in ('Frame', 'Components', 'Hardware'):
+        if not any(g == group for g, *_ in rows):
+            continue
         lines += [f'## {group}', '', '| Qty | Item |', '|---:|---|']
         lines += [f'| {n} | ' + (f'[{item}]({url})' if url else item) + ' |'
                   for g, item, n, url in rows if g == group]
         lines.append('')
-    with open(os.path.join(OUT, 'BOM.md'), 'w') as f:
+    with open(os.path.join(OUT, out), 'w') as f:
         f.write('\n'.join(lines))
     for r in rows:
         log('BOM %s: %d x %s' % (r[0], r[2], r[1]))
 
 
 # ------------------------------------------------------------------ checks + pictures
+# The models use the board frame (X along the board toward the front of the case, Y up, Z toward the
+# push-pull fans). The assembly is turned into FreeCAD's view frame, so that its standard views match the
+# case: board +X (the front) -> -Y (FreeCAD's Front view looks along +Y), board +Y (up) -> +Z, and
+# board +Z (the left side) -> -X. The overlap check works in the board frame (it leaves this out).
+VIEW_ROT = App.Rotation(App.Matrix(0, 0, -1, 0, -1, 0, 0, 0, 0, 1, 0, 0))
+
+
 def global_shape(obj, group=None):
     s = Part.getShape(obj, '', transform=True).copy()
     if group is not None:
@@ -586,7 +689,9 @@ def interference(board, groups):
         for o in g.Group:
             if o.TypeId == 'App::Link':
                 parts.append((o.Name, global_shape(o, g)))
-    parts = [(n, s) for n, s in parts if not s.isNull() and s.Volume > 1e-6 and 'Insert' not in n]
+    # inserts, T-nuts and blind-joint screws share material with what they thread into, by design
+    parts = [(n, s) for n, s in parts if not s.isNull() and s.Volume > 1e-6
+             and not any(k in n for k in ('Insert', 'TNut', 'BlindJoint'))]
     log('checking', len(parts), 'parts')
     res = []
     boxes = [s.BoundBox for _, s in parts]
@@ -605,9 +710,10 @@ def interference(board, groups):
 
 
 def look(v, cam, up=(0, 1, 0)):
-    """Camera from direction cam (board frame), Y up unless given."""
-    z = V(*cam).normalize()
-    x = V(*up).cross(z).normalize()
+    """Camera from direction cam (board frame), Y up unless given. The assembly sits turned by VIEW_ROT, so
+    the directions go through it too."""
+    z = VIEW_ROT.multVec(V(*cam)).normalize()
+    x = VIEW_ROT.multVec(V(*up)).cross(z).normalize()
     y = z.cross(x)
     m = App.Matrix(x.x, y.x, z.x, 0, x.y, y.y, z.y, 0, x.z, y.z, z.z, 0)
     v.setCameraOrientation(App.Rotation(m).Q)
@@ -658,8 +764,21 @@ def compose(raw, dst, size, margin=0.07):
     os.remove(raw)
 
 
-def shots(doc, case_grp):
-    """Render the images and write renders/README.md listing them."""
+def home_view(doc):
+    """The view the assembly file opens with (FreeCAD saves the camera in it): from the front left, above,
+    fitted to the whole model, without the joint markers."""
+    Gui.setActiveDocument(doc.Name)
+    v = Gui.activeDocument().activeView()
+    for o in doc.Objects:
+        if o.TypeId == 'Assembly::JointGroup':
+            o.Visibility = False
+    doc.recompute()
+    Gui.updateGui()
+    look(v, (1, 0.55, 1))
+
+
+def shots(doc, case_grp, only=None):
+    """Render the images and write renders/README.md listing them (only: render just that section)."""
     out = os.environ['SHOTS']
     Gui.setActiveDocument(doc.Name)
     v = Gui.activeDocument().activeView()
@@ -671,28 +790,37 @@ def shots(doc, case_grp):
             o.Visibility = False
     show = lambda keep: [setattr(o, 'Visibility', keep(o.Name)) for o in case_grp.Group]
     # (heading, note, setup, camera up, [(file, caption, camera direction)])
+    pgrp = doc.getObject('Panels')
+
+    def stand(on, standing=True):  # the panels sub-assembly on or off, and the feet for the position
+        pgrp.Visibility = on
+        for o in pgrp.Group:
+            if o.Name.startswith(('Stand', 'Lying')):
+                o.Visibility = o.Name.startswith('Stand') == standing
     sections = [
-        ('Standing', '', lambda: show(lambda n: not n.startswith('LyingFoot')), (0, 1, 0),
+        ('Standing', '', lambda: stand(True), (0, 1, 0),
          [('case_front_left', 'Front left', (1, 0.55, 1)), ('case_back_right', 'Back right', (-1, 0.55, -1)),
           ('case_front', 'Front', (1, 0, 0)), ('case_back', 'Back', (-1, 0, 0)),
-          ('case_left', 'Left', (0, 0, 1)), ('case_right', 'Right', (0, 0, -1)),
-          ('case_bottom', 'Bottom', (0.4, -1, 0.3))]),
+          ('case_left', 'Left', (0, 0, 1)), ('case_right', 'Right', (0, 0, -1))]),
         # on the right side, push-pull fans up, on the tall feet
-        ('Lying flat', '', lambda: show(lambda n: not n.startswith('StandFoot')), (0, 0, 1),
+        ('Lying flat', '', lambda: stand(True, False), (0, 0, 1),
          [('lying_front', 'Front', (1, 0.9, 0.7)), ('lying_side', 'Side', (0.25, 1, 0.12))]),
-        # hide the case shell and grills, keep PSU, hub and hardware
-        ('Inside', 'These views do not show the case and the grills.',
-         lambda: show(lambda n: not n.startswith(('LyingFoot', 'CaseFront', 'CaseBack', 'PushGrill', 'PullGrill',
-                                                  'RearGrill', 'TopVent', 'HubRetainer'))), (0, 1, 0),
-         [('asm_iso', 'Front left', (1, 0.55, 1)), ('asm_top', 'Top', (0, 1, 0.001)),
-          ('asm_push_end', 'Push fan end', (1, 0.8, -0.3)), ('asm_pull_end', 'Pull fan end', (-1, 0.8, 0.6)),
-          ('asm_back', 'Backplate side', (0.3, 0.5, -1))]),
+        ('Frame', 'These views do not show the panels.', lambda: stand(False), (0, 1, 0),
+         [('frame_front_left', 'Front left', (1, 0.55, 1)), ('frame_back_right', 'Back right', (-1, 0.55, -1))]),
     ]
     lines = ['# Renders', '',
-             'The script scripts/build_assembly.py makes these images from the assembly (cad/fish_tank.FCStd).', '']
-    for heading, note, setup, up, views in sections:
+             f'The script scripts/build_assembly.py makes these images from the assembly (cad/{doc.Name}.FCStd).', '']
+    blocks = {}
+    for k, (heading, note, setup, up, views) in enumerate(sections):
+        if only is not None and k != only:  # not rendered in this run: just its README lines
+            blocks[heading] = [f'## {heading}', ''] + ([note, ''] if note else [])
+            for i in range(0, len(views), 2):
+                row = views[i:i + 2]
+                blocks[heading] += ['| ' + ' | '.join(c for _, c, _ in row) + ' |', '|' + '---|' * len(row),
+                                    '| ' + ' | '.join(f'![{heading}, {c.lower()}]({n}.png)' for n, c, _ in row) + ' |', '']
+            continue
         setup()
-        lines += [f'## {heading}', ''] + ([note, ''] if note else [])
+        blocks[heading] = lines_s = [f'## {heading}', ''] + ([note, ''] if note else [])
         for name, caption, cam in views:
             look(v, cam, up)
             raw = os.path.join(out, f'{name}.raw.png')
@@ -700,11 +828,29 @@ def shots(doc, case_grp):
             compose(raw, os.path.join(out, f'{name}.png'), (1600, 1000))
         for i in range(0, len(views), 2):  # two to a row
             row = views[i:i + 2]
-            lines += ['| ' + ' | '.join(c for _, c, _ in row) + ' |', '|' + '---|' * len(row),
-                      '| ' + ' | '.join(f'![{heading}, {c.lower()}]({n}.png)' for n, c, _ in row) + ' |', '']
+            lines_s += ['| ' + ' | '.join(c for _, c, _ in row) + ' |', '|' + '---|' * len(row),
+                        '| ' + ' | '.join(f'![{heading}, {c.lower()}]({n}.png)' for n, c, _ in row) + ' |', '']
+    for heading, *_ in sections:
+        lines += blocks[heading]
     show(lambda n: not n.startswith('LyingFoot'))
     with open(os.path.join(out, 'README.md'), 'w') as f:
         f.write('\n'.join(lines))
+
+def shots_stage():
+    """The renders, in their own FreeCAD runs from the saved assembly, one per section (SECTION=0, 1, 2), with
+    its parts shown or hidden before the first draw: rendered in the run that built it, or after switching
+    parts on or off, the views showed stray fragments (Xvfb)."""
+    doc = App.openDocument(os.path.join(CAD, 'fish_tank.FCStd'))
+    for d in App.listDocuments().values():
+        d.recompute()
+    k = int(os.environ.get('SECTION', '0'))
+    pgrp = doc.getObject('Panels')
+    pgrp.Visibility = k != 2  # 0: standing, 1: lying flat, 2: the frame without the panels
+    for o in pgrp.Group:
+        if o.Name.startswith(('Stand', 'Lying')):
+            o.Visibility = o.Name.startswith('Stand') == (k != 1)
+    shots(doc, doc.getObject('Frame'), only=k); log('shots done')
+
 
 def main():
     prefs = App.ParamGet('User parameter:BaseApp/Preferences/Document')
@@ -716,38 +862,46 @@ def main():
               view.GetInt('HeadlightIntensity', 100))
     view.SetBool('EnableBacklight', True); view.SetInt('BacklightIntensity', 60); view.SetInt('HeadlightIntensity', 90)
     try:
+        if os.environ.get('STAGE') == 'shots':
+            shots_stage()
+            return
+        white, black = (0.93, 0.93, 0.91), (0.11, 0.11, 0.12)  # print colours
         board = build_board(); log('board ok')
         fan = build_fan(); log('fan ok')
         slim = build_slim_fan(); log('slim fan ok')
         psu = build_psu(); hub = build_hub(); fanhub = build_fan_hub(); button = build_button(); log('psu + hub + button ok')
         hw = build_hardware(); log('hardware ok')
-        white, black, blue = (0.93, 0.93, 0.91), (0.11, 0.11, 0.12), (0.09, 0.17, 0.42)  # print colours
         s_push = tidy_printed('fan_shroud_push', white)
         s_pull = tidy_printed('fan_shroud_pull', white)
         clamp = tidy_printed('pcb_clamp', (0.15, 0.45, 0.85))
         mount = tidy_printed('backfan_mount', white)
         tpu = tidy_printed('fan_isolation_tpu', (0.20, 0.20, 0.22))
-        case = tidy_printed('fish_tank_case', black)
-        for g in ('FanGrill', 'RearGrill', 'TopVentGrill'):
-            color(case.getObject(g), blue)
-        for g in ('TpuFootShort', 'TpuFootTall'):
-            color(case.getObject(g), (0.20, 0.20, 0.22))  # TPU, like the fan gaskets
-        color(case.getObject('FanHubFrame'), white)  # like the backplate fan mount it hangs from
-        case.save()
+        hub_frame = tidy_printed('fan_hub_frame', white)  # like the backplate fan mount it hangs from
+        frame = tidy_printed('fish_tank_frame', black)
+        for n in ('Rail_X', 'Rail_Y', 'Rail_Y_Back', 'Rail_Z'):
+            color(frame.getObject(n), (0.74, 0.75, 0.77))  # aluminium
+        for o in frame.Objects:
+            if o.Name.startswith(('Panel', 'Splice')) or o.Name in ('HubCradle', 'TabBar', 'PsuMount'):
+                color(o, black)
+            elif o.Name.startswith('TpuFoot'):
+                color(o, (0.20, 0.20, 0.22))  # TPU, like the fan gaskets
+        for n in ('BHCS_M5x10', 'TNut_M3'):
+            color(frame.getObject(n), (0.10, 0.10, 0.11))
         log('printed parts ok')
-        doc, asm, brd, push, pull, back, cgrp = build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pull, clamp,
-                                                              mount, tpu, case)
+        doc, asm, brd, push, pull, back, fgrp = build_assembly(board, fan, slim, psu, hub, fanhub, button, hw, s_push,
+                                                                s_pull, clamp, mount, tpu, hub_frame, frame)
         bom(doc)
         bad = [(o.Name, o.State) for o in doc.Objects if 'Invalid' in o.State or 'Error' in o.State]
         log('assembly ok; bad objects:', bad)
-        for o in (brd, push, pull, back, cgrp):
+        for o in (brd, push, pull, back, fgrp):
             log(o.Name, 'placement', o.Placement, 'bbox', Part.getShape(o).BoundBox)
-        for r in interference(board, [push, pull, back, cgrp]):
+        for r in interference(board, [push, pull, back, fgrp, doc.getObject('Panels')]):
             log('INTERFERENCE %s vs %s: %.2f mm3' % r)
         log('interference check done')
-        for d in (board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pull, clamp, mount, tpu, case, doc):
+        home_view(doc)
+        for d in (board, fan, slim, psu, hub, fanhub, button, hw, s_push, s_pull, clamp, mount, tpu, hub_frame, frame, doc):
             d.save()
-        shots(doc, cgrp); log('shots done')  # after saving: the render styling stays out of the files
+        log('saved')
     except Exception:
         log(traceback.format_exc())
     finally:
