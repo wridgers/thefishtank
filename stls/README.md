@@ -4,40 +4,40 @@
 > **Work in progress.** The board parts are printed. The enclosure parts are not printed or
 > assembled yet. Examine the fit of each part before you use this design.
 
-An `[a]_` prefix shows a part in the accent colour. An `_xN` suffix shows the quantity to print.
-Print the other parts in the primary colour. Print the `tpu_` parts in TPU.
+An `_xN` suffix shows the quantity to print. Print all the parts in one colour, and the `tpu_` parts
+in TPU.
 
 ## Board parts
 
 These parts attach to the BC-250 and hold its fans.
 
-| STL | Qty | Colour / material |
+| STL | Qty | Material |
 |---|---|---|
-| `fan_shroud_push.stl`, `fan_shroud_pull.stl` | 1 each | Primary |
-| `pcb_clamp_x7.stl` | 7 | Primary |
-| `backfan_mount.stl` | 1 | Primary |
-| `fan_hub_frame.stl` | 1 | Primary |
+| `fan_shroud_push.stl`, `fan_shroud_pull.stl` | 1 each | PETG, ASA, or ABS |
+| `pcb_clamp_x7.stl` | 7 | PETG, ASA, or ABS |
+| `backfan_mount.stl` | 1 | PETG or ASA |
+| `fan_hub_frame.stl` | 1 | PETG or ASA |
 | `tpu_fan_gasket_x5.stl` | 5 | TPU |
 | `tpu_fan_washer_x4.stl` | 4 | TPU |
 
 ## Enclosure parts
 
-| STL | Qty | Colour / material |
+| STL | Qty | Material |
 |---|---|---|
-| `panel_left_back.stl`, `panel_left_front.stl` | 1 each | Primary |
-| `panel_right_back.stl`, `panel_right_middle.stl`, `panel_right_front.stl` | 1 each | Primary |
-| `panel_top_back.stl`, `panel_top_front.stl` | 1 each | Primary |
-| `panel_bottom_back.stl`, `panel_bottom_front.stl` | 1 each | Primary |
-| `panel_front.stl`, `panel_back_bottom.stl`, `panel_back_top.stl` | 1 each | Primary |
-| `splice_side_x3.stl` | 3 | Primary. One for the left panel, two for the right panel. |
-| `splice_top_bottom_x2.stl` | 2 | Primary. One for the top panel, one for the bottom panel. |
-| `back_brace.stl` | 1 | Primary |
-| `tab_bar.stl` | 1 | Primary |
-| `psu_mount.stl` | 1 | Primary |
-| `hub_cradle.stl` | 1 | Primary |
+| `panel_left_back.stl`, `panel_left_front.stl` | 1 each | PETG or ASA |
+| `panel_right_back.stl`, `panel_right_middle.stl`, `panel_right_front.stl` | 1 each | PETG or ASA |
+| `panel_top_back.stl`, `panel_top_front.stl` | 1 each | PETG or ASA |
+| `panel_bottom_back.stl`, `panel_bottom_front.stl` | 1 each | PETG or ASA |
+| `panel_front.stl`, `panel_back_bottom.stl`, `panel_back_top.stl` | 1 each | PETG or ASA |
+| `splice_side_x3.stl` | 3 | PETG or ASA. One for the left panel, two for the right panel. |
+| `splice_top_bottom_x2.stl` | 2 | PETG or ASA. One for the top panel, one for the bottom panel. |
+| `back_brace.stl` | 1 | PETG or ASA |
+| `tab_bar.stl` | 1 | PETG or ASA |
+| `psu_mount.stl` | 1 | PETG or ASA |
+| `hub_cradle.stl` | 1 | PETG or ASA |
 | `tpu_foot_short_x4.stl` | 4 | TPU, for the standing position |
 | `tpu_foot_tall_x4.stl` | 4 | TPU, for the lying position |
-| `[a]_blind_joint_drill_jig.stl` | 1 | Accent. A tool to drill the frame (5 mm access holes and 3.4 mm brace screw holes). You do not install it. |
+| `blind_joint_drill_jig.stl` | 1 | PETG or ASA. A tool to drill the 5 mm access holes in the long rails. You do not install it. |
 
 ## Notes
 
@@ -47,9 +47,8 @@ These parts attach to the BC-250 and hold its fans.
 - **Orientation.** Print each STL file in the orientation that it has. Each part that you can see
   prints with its visible face on the bed. Thus you can use a textured build plate, or a special
   pattern for the first layer (for example, a Hilbert curve).
-- **Material.** The shrouds and the clamps touch the heatsink. Print them in a material that is
-  resistant to heat, for example PETG, ASA, or ABS. Do not use PLA. Use PETG or ASA for the panels
-  and the other parts that are not TPU.
+- **Material.** Do not use PLA. The shrouds and the clamps touch the heatsink, so print them in a
+  material that is resistant to heat.
 - **Edges.** The panel edges are 45° mitres, so the panels meet at sharp square corners. The mitres
   lean in from the bed, so they print without supports. There is a 0.3 mm gap between the mitres of
   two panels, and between the pieces of a split panel.

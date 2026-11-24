@@ -1010,7 +1010,7 @@ def export_stl(shape, path, max_overhang=65.5, tight=False):
     return check_lock(sh, path) and ok
 
 
-# Parts that are printed and in use are locked: stls/locked.json holds a fingerprint of each one's
+# Parts that are printed and in use are locked: cad/locked.json holds a fingerprint of each one's
 # exact (B-rep) shape, and a build that changes a locked part fails. Accept a change with
 # `make relock` (LOCK_UPDATE=all) or lock more parts with `make relock PARTS=a.stl,b.stl`.
 LOCK_TOL = {'volume': 1e-6, 'area': 1e-6, 'moments': 1e-6}  # relative; lengths are within 0.001 mm
@@ -1029,7 +1029,7 @@ def fingerprint(sh):
 
 def check_lock(sh, path):
     name = os.path.basename(path)
-    lock_path = os.path.join(os.path.dirname(path), 'locked.json')
+    lock_path = os.path.join(CADDIR, 'locked.json')  # keyed by the STL (or part) name
     locked = json.load(open(lock_path)) if os.path.exists(lock_path) else {}
     fp = fingerprint(sh)
     update = os.environ.get('LOCK_UPDATE', '')

@@ -78,12 +78,13 @@ FRAME = [
     ('BraceL', '=RailLZ - 2 * BraceClear', 'Back brace length (Z), between the back uprights'),
     ('BraceD', 18.0, 'Back brace depth (X): from the back panel to just short of the PCB'),
     ('BraceH', 16.0, 'Back brace height (Y)'),
-    ('BraceY0', -12.5, 'Back brace underside (Y): 0.5 above the PSU; its top is 1 under the I/O bracket'),
-    ('BraceEndT', 6.0, 'Back brace end wall: carries the insert for the screw from outside the upright'),
-    ('BraceWinL', 18.0, 'Window behind each end wall: room to press the insert in'),
+    ('BraceY0', '=PsuY0 + PsuH', 'Back brace underside (Y): on the PSU, which sets its height (its end screws go into '
+                                 'T-nuts, which slide); its top is 1.5 under the I/O bracket'),
+    ('BraceEndT', 4.0, 'Back brace end wall: a BHCS M3x10 through it reaches as far into the T-nut as a panel screw'),
+    ('BraceWinL', 18.0, 'Window behind each end wall: room for the screw head, and for a hex key from above at about 15 deg'),
     ('BraceWinW', 9.0, ''),
     ('BraceScrewY', '=SlotC', 'End screws from the brace back face: on the uprights\' slot centre'),
-    ('BraceScrewZ', '=BraceH / 2', 'End screw height in the brace'),
+    ('BraceScrewZ', '=BraceH - 4', 'End screw height in the brace: high, so the key comes out of the window top'),
     # a ridge on the brace top with a slot that the bottom of the I/O bracket drops into, the way a case
     # holds a PCIe card's bracket (the tab screw holds the top). Thick walls both sides: the plugs push the
     # bracket forward, and pull it back
@@ -95,17 +96,16 @@ FRAME = [
     ('BraceRidgeFrontX', 4.0, 'Ridge front face (X): past the brace front, over a 45 deg underside (clear of the PCB edge)'),
     ('BraceRidgeZ0', 2.0, 'Ridge from here (Z): clear of the PCB (0..1.6) and the bracket\'s side flange'),
     ('BraceRidgeFillet', 4.0, 'Fillet at the root of the ridge\'s back wall: it spreads the load from the bracket'),
-    ('BraceScrewUp', '=BraceY0 + BraceScrewZ - YBotIn - ExtW', 'End screws: hole through the back uprights, this far '
-                     'from their bottom end (drilled with the jig, BHCS M3x20 from outside)'),
     # --- I/O bracket tab: screwed (from above, before the top back cross rail goes in) into an insert in a
-    # printed tab bar across the full width between the back uprights, fixed at each end like the back brace
-    # (a BHCS M3x20 from outside the upright, through a hole drilled 29 mm from its top end, into an insert)
+    # printed tab bar across the full width between the back uprights, fixed at each end by a BHCS M3x10 from
+    # inside, through the end wall, into a T-nut in the upright's inner slot (a ball-end hex key reaches it)
     ('TabX', -12.35, 'I/O bracket tab screw (X)'), ('TabZ', 6.7, '... (Z)'), ('TabUnderY', 115.9, 'Tab underside (Y)'),
     ('MountBackGap', 0.3, 'Tab bar to the back panel (the panel comes off on its own)'),
     ('ArmH', 8.0, 'Tab bar height under the tab'),
     ('ArmX1', -5.0, 'Tab bar front face (X): nothing of the board but the tab is behind -5'),
-    ('TabBarScrewY', '=YBotIn + ExtW + RailLY - BraceScrewUp', 'Tab bar end screws (Y): 29 mm from the uprights\' top end'),
-    ('TabBarEndY0', '=TabBarScrewY - 6', 'Tab bar end blocks: down to here, round the end screws'),
+    ('TabBarEndT', 4.0, 'Tab bar end walls: a BHCS M3x10 through one reaches as far into the T-nut as a panel screw'),
+    ('TabBarScrewY', '=TabUnderY - ArmH - 5', 'Tab bar end screws (Y): under the bar, with room for the head'),
+    ('TabBarEndY0', '=TabBarScrewY - 5', 'Tab bar end walls: down to here, round the end screws'),
     # --- panels
 
     # hex deboss pattern on the front panel's outer face (the panels print on their outer face, so the
@@ -204,9 +204,7 @@ FRAME = [
     ('JigHoleD', 5.0, 'Access hole: room for a 3 mm hex key (BHCS M5 head)'), ('JigBoreClear', 0.15, 'Guide bore clearance (each side)'),
     ('JigHoleX', '=ExtW / 2', 'Access hole from the rail end'),
     ('JigGuideT', 10.0, 'Guide plate thickness (bore length)'), ('JigWallT', 4.0, ''), ('JigWallH', 14.0, 'Side walls down the rail'),
-    ('JigHole2D', '=ClearD', 'Second bore: the back brace screw hole through the back uprights'),
-    ('JigHole2X', '=BraceScrewUp', '... from the upright end'),
-    ('JigClear', 0.2, 'Jig to rail clearance (each side)'), ('JigL', 40.0, 'Jig length along the rail, from the end stop'),
+    ('JigClear', 0.2, 'Jig to rail clearance (each side)'), ('JigL', 25.0, 'Jig length along the rail, from the end stop'),
 ]
 
 
@@ -273,7 +271,8 @@ def fillet(body, P, name, radius, pred, count=None):
 def build_brace(doc, P):
     """Back brace, in print orientation lying on its back x length face: local x along it (case Z, from the
     right upright), y its depth (case X, from the back panel), z its height (case Y, from its underside).
-    End screws run along x through teardrop holes (point up, +z) into T-nuts in the uprights."""
+    End screws run along x through teardrop holes (point up, +z) into T-nuts in the uprights. Returns the body
+    and the end screws' fixings (board frame)."""
     body = doc.addObject('PartDesign::Body', 'BackBrace')
     s = SK(body, P, 'BraceSketch', 'XY_Plane')
     s.rect('0', 'BraceL', '0', 'BraceD')
@@ -297,14 +296,10 @@ def build_brace(doc, P):
         s.px(A, 3, repr(cx)); s.py(A, 3, repr(sy)); s.dim('Radius', A, expr=repr(R))
         s.px(Ln, 1, repr(x)); s.px(Ln, 2, repr(x))
         feat(body, P, 'Pad', f'BraceBump{i}', s, 'BraceH')
-    # the end screws come from outside the uprights into inserts pressed into the end walls from the windows
-    # (the screw pulls them against the wall)
-    for i, (x, d) in enumerate((('BraceEndT', '-'), ('BraceL - BraceEndT', '+')), start=1):
-        s = SK(body, P, f'BraceInsert{i}Sketch', 'YZ_Plane', x)
-        teardrop(s, 'BraceScrewY', 'BraceScrewZ', 'InsertD', '+v')
-        cut_through(body, P, f'BraceInsert{i}', s, '2 * InsertDepth')
+    # the end screws (BHCS M3x10) go from the windows through the end walls into T-nuts in the uprights' inner slots
+    for i, x in enumerate(('BraceEndT', 'BraceL - BraceEndT'), start=1):
         s = SK(body, P, f'BraceHole{i}Sketch', 'YZ_Plane', x)
-        teardrop(s, 'BraceScrewY', 'BraceScrewZ', 'ScrewD', '+v')
+        teardrop(s, 'BraceScrewY', 'BraceScrewZ', 'ClearD', '+v')
         cut_through(body, P, f'BraceHole{i}', s, '2 * (BraceEndT + BraceClear + SlotBumpH + 1)')
     # ridge with a slot for the bottom of the I/O bracket: a wall behind it, and a wall in front of it that
     # runs out past the brace front over a 45 deg underside (local: y = case X - XBackIn, z = case Y - BraceY0)
@@ -323,7 +318,12 @@ def build_brace(doc, P):
     fillet(body, P, 'BraceRidgeFillet', 'BraceRidgeFillet', lambda e: e.BoundBox.YLength < 1e-6 and
            e.BoundBox.ZLength < 1e-6 and abs(e.BoundBox.YMin - yv) < 1e-6 and abs(e.BoundBox.ZMin - zv) < 1e-6, count=1)
     chamfer(body, P, 'BedChamfer', 'BedChamfer', at_z(0))
-    return body
+    g = P.__getitem__
+    x, y = g('XBackIn') + g('BraceScrewY'), g('BraceY0') + g('BraceScrewZ')
+    fixings = [dict(kind='brace_rail', p=[x, y, rail + sg * (g('BraceClear') + g('BraceEndT'))], n=[0, 0, sg], rail='Y',
+                    nut=[x, y, rail - sg * g('SlotLip')])
+               for rail, sg in ((g('ZRightIn') + g('ExtW'), 1), (g('ZLeftIn') - g('ExtW'), -1))]
+    return body, fixings
 
 
 # ------------------------------------------------------------------ panels (Part solids in the board frame)
@@ -856,31 +856,37 @@ def build_hub_cradle(P):
 def build_tab_bar(P):
     """Tab bar, in the board frame: a bar under the I/O bracket tab across the full width between the back
     uprights (so the tab screw doesn't lever a one-sided mount off its rail), with the tab insert pressed in
-    from the top. Each end is a block down round its end screw: a BHCS M3x20 from outside the upright into an
-    insert pressed in from the block's inner face (the screw pulls it against the block). Prints on its back
-    face: the holes along Y and Z are teardrops."""
+    from the top. Each end is a wall from under its end screw up to the top of the upright: its slot bump
+    stops against the top long rail, which sets the bar's height (the T-nut can slide). A BHCS M3x10 goes from
+    inside, through the wall, into a T-nut in the upright's inner slot. Prints on its back face: the holes
+    along Y and Z are teardrops.
+    Returns the shape and the fixings."""
     g = P.__getitem__
     x0, x1 = g('XBackIn') + g('MountBackGap'), g('ArmX1')
     za, zb = g('ZRightIn') + g('ExtW') + g('BraceClear'), g('ZLeftIn') - g('ExtW') - g('BraceClear')
     ya, yt = g('TabUnderY') - g('ArmH'), g('TabUnderY')
-    t = g('BraceEndT')
+    ys = g('YTopIn') - g('ExtW')  # the uprights' top ends: the top long rails' bottom faces
+    t = g('TabBarEndT')
     box = lambda y0, y1, z0, z1: Part.makeBox(x1 - x0, y1 - y0, z1 - z0, V(x0, y0, z0))
     sx, sy = g('XBackIn') + g('SlotC'), g('TabBarScrewY')
     # slot bumps on the end faces, along the back uprights' inner slots
-    bumps = [slot_bump(P, V(sx, g('TabBarEndY0'), z), V(0, 1, 0), yt - g('TabBarEndY0'), V(0, 0, sg), V(1, 0, 0),
+    bumps = [slot_bump(P, V(sx, g('TabBarEndY0'), z), V(0, 1, 0), ys - g('TabBarEndY0'), V(0, 0, sg), V(1, 0, 0),
                        gap=g('BraceClear')) for z, sg in ((za, -1), (zb, 1))]
-    sh = box(ya, yt, za, zb).fuse([box(g('TabBarEndY0'), yt, za, za + t), box(g('TabBarEndY0'), yt, zb - t, zb)]
+    sh = box(ya, yt, za, zb).fuse([box(g('TabBarEndY0'), ys, za, za + t), box(g('TabBarEndY0'), ys, zb - t, zb)]
                                   + bumps).removeSplitter()
     up = V(1, 0, 0)  # print up
     tab = V(g('TabX'), g('TabUnderY'), g('TabZ'))
     cuts = [teardrop_prism(tab, V(0, 1, 0), up, g('InsertD'), 2 * g('InsertDepth')),
             teardrop_prism(tab, V(0, 1, 0), up, g('ScrewD'), 2 * g('ArmH') + 2)]
-    for zf, sg in ((za + t, -1), (zb - t, 1)):  # inner faces of the end blocks; the insert goes outward from there
-        cuts += [teardrop_prism(V(sx, sy, zf + sg * g('InsertDepth') / 2), V(0, 0, 1), up, g('InsertD'), g('InsertDepth')),
-                 teardrop_prism(V(sx, sy, zf + sg * t / 2), V(0, 0, 1), up, g('ScrewD'), t + 2 * (g('BraceClear') + g('SlotBumpH')) + 2)]
+    fixings = []
+    for zf, sg, rail in ((za + t, 1, g('ZRightIn') + g('ExtW')), (zb - t, -1, g('ZLeftIn') - g('ExtW'))):
+        # zf: the wall's inner face (the screw head's seat); sg: toward the head
+        cuts.append(teardrop_prism(V(sx, sy, zf - sg * t / 2), V(0, 0, 1), up, g('ClearD'),
+                                   t + 2 * (g('BraceClear') + g('SlotBumpH')) + 2))
+        fixings.append(dict(kind='tab_rail', p=[sx, sy, zf], n=[0, 0, sg], rail='Y', nut=[sx, sy, rail - sg * g('SlotLip')]))
     sh = sh.cut(cuts)
     es = [e for e in sh.Edges if all(abs(vx.Point.x - x0) < 1e-6 for vx in e.Vertexes) and not isinstance(e.Curve, Part.Circle)]
-    return sh.makeChamfer(g('BedChamfer'), es)
+    return sh.makeChamfer(g('BedChamfer'), es), fixings
 
 
 def build_psu_mount(P):
@@ -950,9 +956,8 @@ def build_foot(P, h, recess):
 
 def build_jig(P):
     """Blind-joint drill jig, in print orientation (guide face on the bed): local x along the rail (end stop
-    at x < 0), y across it, z down the rail from its face (z = JigGuideT at the rail face). Two guide bores:
-    5 mm, 10 mm from the end (blind-joint access holes), and 3.4 mm, BraceScrewUp from the end (the back
-    brace screw holes through the back uprights)."""
+    at x < 0), y across it, z down the rail from its face (z = JigGuideT at the rail face). A 5 mm guide bore,
+    10 mm from the end: the blind-joint access holes."""
     g = P.__getitem__
     t, w, c, L = g('JigGuideT'), g('JigWallT'), g('JigClear'), g('JigL')
     half = g('ExtW') / 2 + c
@@ -962,8 +967,7 @@ def build_jig(P):
     key = slot_bump(P, V(0, 0, t), V(1, 0, 0), L, V(0, 0, 1), V(0, 1, 0), taper=(False, True))
     sh = sh.fuse(key).removeSplitter()
     bore = Part.makeCylinder(g('JigHoleD') / 2 + g('JigBoreClear'), t + g('SlotBumpH') + 2, V(g('JigHoleX'), 0, -1))
-    bore2 = Part.makeCylinder(g('JigHole2D') / 2 + g('JigBoreClear'), t + g('SlotBumpH') + 2, V(g('JigHole2X'), 0, -1))
-    sh = sh.cut([bore, bore2])
+    sh = sh.cut(bore)
     es = [e for e in sh.Edges if abs(e.BoundBox.ZMax) < 1e-6 and not isinstance(e.Curve, Part.Circle)]
     sh = sh.makeChamfer(g('BedChamfer'), es)
     es = [e for e in sh.Edges if abs(e.BoundBox.ZMin - (t + g('JigWallH'))) < 1e-6 and abs(e.BoundBox.ZMax - e.BoundBox.ZMin) < 1e-6]
@@ -975,25 +979,21 @@ def build_frame():
     P = Params(doc, FRAME)
     for n, L in (('Rail_X', P['RailLX']), ('Rail_Y', P['RailLY']), ('Rail_Z', P['RailLZ'])):
         rail(doc, n, L)
-    # back uprights: a hole through them for the back brace screw (along the rail's local z: the board Z)
-    back = rail(doc, 'Rail_Y_Back', P['RailLY'])
-    back.Shape = back.Shape.cut([Part.makeCylinder(P['ClearD'] / 2, P['ExtW'] + 2, V(x, 0, -P['ExtW'] / 2 - 1))
-                                 for x in (P['BraceScrewUp'], P['RailLY'] - P['BraceScrewUp'])])  # brace, tab bar
-    # the extrusions are bought (cut to these lengths, and drilled to these holes): they are locked like the
-    # printed parts (stls/locked.json). Change them only if there is no other way; then make relock
+    # the extrusions are bought (cut to these lengths, the uprights and cross rails tapped M5): they are locked like the
+    # printed parts (cad/locked.json). Change them only if there is no other way; then make relock
     # PARTS=Rail_X,...
-    for n in ('Rail_X', 'Rail_Y', 'Rail_Y_Back', 'Rail_Z'):
+    for n in ('Rail_X', 'Rail_Y', 'Rail_Z'):
         print(f'  {n}: {doc.getObject(n).Label}: bought extrusion lock '
               f'ok={check_lock(doc.getObject(n).Shape, os.path.join(OUTDIR, "stls", n))}')
     bhcs_m5(doc, 10)
     tnut_m3(doc)
-    build_brace(doc, P)
+    _, bfix = build_brace(doc, P)
     panels, extra, fixings = build_panels(P)
     ret, rfix = build_hub_cradle(P)
     pmount, pfix = build_psu_mount(P)
     extra['PsuMount'] = pmount
     extra['HubCradle'] = ret
-    extra['TabBar'] = build_tab_bar(P)
+    extra['TabBar'], tfix = build_tab_bar(P)
     for name, h, rec in (('TpuFootShort', 'FootShortH', 'FootShortRecess'), ('TpuFootTall', 'FootTallH', 'FootTallRecess')):
         extra[name] = build_foot(P, P[h], P[rec])
     extra['DrillJig'] = build_jig(P)
@@ -1001,7 +1001,7 @@ def build_frame():
         doc.addObject('Part::Feature', name).Shape = sh
     fx = doc.addObject('App::FeaturePython', 'Fixings')
     fx.addProperty('App::PropertyString', 'Data', 'Fixings', 'Screw positions for the assembly (JSON, board frame)')
-    fx.Data = json.dumps(fixings + rfix + pfix)
+    fx.Data = json.dumps(fixings + rfix + pfix + tfix + bfix)
     doc.recompute()
     return doc
 
@@ -1027,7 +1027,7 @@ PRINT_QTY = {'PanelLeftBack': (1, 'panel_left_back', False), 'PanelLeftFront': (
              'BackBrace': (1, 'back_brace', False), 'HubCradle': (1, 'hub_cradle', False),
              'TabBar': (1, 'tab_bar', False), 'PsuMount': (1, 'psu_mount', False),
              'TpuFootShort': (4, 'tpu_foot_short', False), 'TpuFootTall': (4, 'tpu_foot_tall', False),
-             'DrillJig': (1, 'blind_joint_drill_jig', True)}
+             'DrillJig': (1, 'blind_joint_drill_jig', False)}
 BED = 250.0
 
 if os.environ.get('GEN_MAIN') == 'frame':

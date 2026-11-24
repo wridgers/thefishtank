@@ -83,9 +83,10 @@ sketches, so you can change the values in FreeCAD.
   back brace. The script calculates the other enclosure parts (for example, the panels) only when it
   runs. They do not change when you change the spreadsheet.
 
-**Locked parts.** Some parts are printed and in use, and the extrusions are bought. `stls/locked.json`
-keeps the size and shape of each of these parts. If a change to the scripts changes a locked part, the build stops and
-shows the change. This also applies when the part changes because of a shared parameter.
+**Locked parts.** Some parts are printed and in use, and the extrusions are bought.
+`cad/locked.json` keeps the size and shape of each of these parts. If a change to the scripts
+changes a locked part, the build stops and shows the change. This also applies when the part
+changes because of a shared parameter.
 - To accept the change to a locked part, use `make relock PARTS=<file>.stl`.
 - To accept the changes to all the locked parts, use `make relock`.
 - To lock more parts, use `make relock PARTS=<file>.stl,<file>.stl`.

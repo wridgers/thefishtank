@@ -86,10 +86,10 @@ clean:
 	rm -f $(SHROUD_FCSTD) $(FRAME_FCSTD) $(ASSEMBLY) BOM.md
 	rm -f $(addprefix cad/,bc250_board.FCStd fan_120x25.FCStd fan_120x15.FCStd psu_flex_atx.FCStd \
 	      usb_hub_anker.FCStd fan_hub.FCStd power_button_16mm.FCStd hardware_m3.FCStd)
-	rm -f stls/*.stl  # keeps the READMEs and locked.json
+	rm -f stls/*.stl  # keeps the READMEs
 	rm -rf logs renders
 
-# Printed parts in use are locked (stls/locked.json): a build that changes one fails. To accept the
+# Printed parts in use are locked (cad/locked.json): a build that changes one fails. To accept the
 # change (or lock more parts), regenerate them with their new fingerprints, then rebuild the rest:
 #   make relock                       every locked part
 #   make relock PARTS=a.stl,b.stl     just these (and lock them if they aren't yet)

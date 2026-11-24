@@ -476,7 +476,7 @@ def frame_group(doc, asm, link, frame, psu, hub, button, hw):
     # uprights (Y) between them, each end an M5 into its tapped end, head under the long rail's slot lip
     for xn, x in xs.items():
         for zn, z in zs.items():
-            link(grp, f'RailY_{xn}{zn}', frame.getObject('Rail_Y_Back' if xn == 'Back' else 'Rail_Y'), along_y,
+            link(grp, f'RailY_{xn}{zn}', frame.getObject('Rail_Y'), along_y,
                  (x, f'{F}YBotIn + {F}ExtW', z))
             link(grp, f'BlindJoint_Y{xn}{zn}Top', m5, Rot(V(1, 0, 0), -90), (x, f'{F}YTopIn - {F}ExtW + {lip}', z))
             link(grp, f'BlindJoint_Y{xn}{zn}Bot', m5, Rot(V(1, 0, 0), 90), (x, f'{F}YBotIn + {F}ExtW - {lip}', z))
@@ -486,22 +486,13 @@ def frame_group(doc, asm, link, frame, psu, hub, button, hw):
         link(grp, f'RailZ_{xn}{yn}', frame.getObject('Rail_Z'), along_z, (x, y, f'{F}ZRightIn + {F}ExtW'))
         link(grp, f'BlindJoint_Z{xn}{yn}R', m5, Rot(V(1, 0, 0), 180), (x, y, f'{F}ZRightIn + {F}ExtW - {lip}'))
         link(grp, f'BlindJoint_Z{xn}{yn}L', m5, Rot(), (x, y, f'{F}ZLeftIn - {F}ExtW + {lip}'))
-    # back braces (modelled lying on their back face: local x -> Z, y -> X, z -> Y), above the PSU and under
-    # the top panel, an M3 at each end through the end wall into a T-nut in the upright's slot
+    # the back brace (modelled lying on its underside: local x -> Z, y -> X, z -> Y), on the PSU; its end
+    # screws (from the Fixings) go through the end walls into T-nuts in the uprights' inner slots
     brace_rot = App.Rotation(App.Matrix(0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0))
     m3x10 = hw.getObject('BHCS_M3x10')
     tnut = frame.getObject('TNut_M3')
-    for n, y0 in (('Bottom', F + 'BraceY0'),):
-        link(grp, f'BackBrace{n}', frame.getObject('BackBrace'), brace_rot,
-             (F + 'XBackIn', y0, f'{F}ZRightIn + {F}ExtW + {F}BraceClear'))
-        bx, by = f'{F}XBackIn + {F}BraceScrewY', f'{y0} + {F}BraceScrewZ'
-        # end screws from outside, through the uprights (head on the outer slot's floor) into the end wall inserts
-        floor = f'{F}ExtW / 2 - 3.9'  # slot floor: 3.9 from the profile centre (profile_2020)
-        link(grp, f'Brace{n}ScrewR_M3x20', hw.getObject('BHCS_M3x20'), Rot(V(1, 0, 0), 180), (bx, by, f'{F}ZRightIn + {floor}'))
-        link(grp, f'Brace{n}ScrewL_M3x20', hw.getObject('BHCS_M3x20'), Rot(), (bx, by, f'{F}ZLeftIn - ({floor})'))
-        ins = f'{F}ExtW + {F}BraceClear + {F}BraceEndT'
-        link(grp, f'Brace{n}InsertR', hw.getObject('Insert_M3x5x4'), Rot(V(1, 0, 0), 180), (bx, by, f'{F}ZRightIn + {ins}'))
-        link(grp, f'Brace{n}InsertL', hw.getObject('Insert_M3x5x4'), Rot(), (bx, by, f'{F}ZLeftIn - ({ins})'))
+    link(grp, 'BackBraceBottom', frame.getObject('BackBrace'), brace_rot,
+         (F + 'XBackIn', F + 'BraceY0', f'{F}ZRightIn + {F}ExtW + {F}BraceClear'))
     # panels, splice strips and the hub retainer (modelled in the board frame). The panels, with their
     # splice strips, feet and all their hardware, are a sub-assembly: hide it to see inside.
     pgrp = doc.addObject('App::Part', 'Panels')
@@ -556,17 +547,13 @@ def frame_group(doc, asm, link, frame, psu, hub, button, hw):
             place(f'PsuMountTNut{i}', tnut, V(*f['nut']), n, axis[f['rail']])
         elif k == 'psu':
             place(f'PsuScrew{i}', hw.getObject('FHCS_6_32x3_8'), p, n)
+        elif k in ('tab_rail', 'brace_rail'):  # tab bar and back brace end walls, into the back uprights' inner slots
+            part = 'TabBar' if k == 'tab_rail' else 'Brace'
+            place(f'{part}Screw{i}_M3x10', hw.getObject('BHCS_M3x10'), p, n)
+            place(f'{part}TNut{i}', tnut, V(*f['nut']), n, axis[f['rail']])
         elif k == 'hub_rail':  # the USB hub cradle, on the front right upright's back slot
             place(f'HubCradleScrew{i}_M3x16', fhcs16, p, n)
             place(f'HubCradleTNut{i}', tnut, V(*f['nut']), n, axis[f['rail']])
-    # the tab bar's end screws, from outside the back uprights (as the back brace's)
-    floor = f'{F}ExtW / 2 - 3.9'
-    ty, tx = F + 'TabBarScrewY', f'{F}XBackIn + {F}SlotC'
-    link(grp, 'TabBarScrewR_M3x20', hw.getObject('BHCS_M3x20'), Rot(V(1, 0, 0), 180), (tx, ty, f'{F}ZRightIn + {floor}'))
-    link(grp, 'TabBarScrewL_M3x20', hw.getObject('BHCS_M3x20'), Rot(), (tx, ty, f'{F}ZLeftIn - ({floor})'))
-    ins = f'{F}ExtW + {F}BraceClear + {F}BraceEndT'
-    link(grp, 'TabBarInsertR', insert, Rot(V(1, 0, 0), 180), (tx, ty, f'{F}ZRightIn + {ins}'))
-    link(grp, 'TabBarInsertL', insert, Rot(), (tx, ty, f'{F}ZLeftIn - ({ins})'))
     # the I/O bracket tab: insert in the tab bar, screw from above (before the top back cross rail goes in)
     link(grp, 'TabInsert', insert, Rot(V(1, 0, 0), 90), (F + 'TabX', F + 'TabUnderY', F + 'TabZ'))
     link(grp, 'TabScrew_M3x10', m3x10, Rot(V(1, 0, 0), -90), (F + 'TabX', f'{F}TabUnderY + 1.1', F + 'TabZ'))
@@ -612,10 +599,7 @@ LINKS = {
 BUY.update({
     ('fish_tank_frame', 'Rail_X'): ('Frame', '2020 aluminium extrusion, {L} mm (long rail): blind-joint access holes '
                                                '(refer to stls/ASSEMBLY.md)'),
-    ('fish_tank_frame', 'Rail_Y'): ('Frame', '2020 aluminium extrusion, {L} mm (front upright): both ends tapped M5'),
-    ('fish_tank_frame', 'Rail_Y_Back'): ('Frame', '2020 aluminium extrusion, {L} mm (back upright): both ends tapped '
-                                                  'M5, and a 3.4 mm hole through 29 mm from each end (back brace, tab bar) '
-                                                  '(refer to stls/ASSEMBLY.md)'),
+    ('fish_tank_frame', 'Rail_Y'): ('Frame', '2020 aluminium extrusion, {L} mm (upright): both ends tapped M5'),
     ('fish_tank_frame', 'Rail_Z'): ('Frame', '2020 aluminium extrusion, {L} mm (cross rail): both ends tapped M5'),
     ('fish_tank_frame', 'BHCS_M5x10'): ('Hardware', 'BHCS M5x10 (ISO 7380), for the blind joints'),
     ('fish_tank_frame', 'TNut_M3'): ('Hardware', 'M3 drop-in T-nut for 2020 slots'),
@@ -878,7 +862,7 @@ def main():
         tpu = tidy_printed('fan_isolation_tpu', (0.20, 0.20, 0.22))
         hub_frame = tidy_printed('fan_hub_frame', white)  # like the backplate fan mount it hangs from
         frame = tidy_printed('fish_tank_frame', black)
-        for n in ('Rail_X', 'Rail_Y', 'Rail_Y_Back', 'Rail_Z'):
+        for n in ('Rail_X', 'Rail_Y', 'Rail_Z'):
             color(frame.getObject(n), (0.74, 0.75, 0.77))  # aluminium
         for o in frame.Objects:
             if o.Name.startswith(('Panel', 'Splice')) or o.Name in ('HubCradle', 'TabBar', 'PsuMount'):

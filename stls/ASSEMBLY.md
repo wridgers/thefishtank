@@ -13,16 +13,12 @@ the items in [`BOM.md`](../BOM.md).
    2. Tap the centre hole M5 at the two ends of each upright and each cross rail.
    3. Drill the access holes in the long rails with the drill jig. Refer to
       [Access holes](#access-holes).
-   4. Drill the two screw holes through each back upright with the drill jig, one at each end. Refer
-      to [Brace screw holes](#brace-screw-holes).
 2. **Inserts.** Install the heat-set inserts.
    1. Install the splice strip inserts from the face that does not touch the panel.
-   2. Install the tab insert in the tab bar, from its top face. Install the inserts in the two end blocks
-      of the tab bar, from their inner faces.
-   3. Install the two inserts in the back brace from the windows, one in each end wall.
-   4. Install the fan inserts and the clamp inserts in the shrouds, and the fan inserts in the
+   2. Install the tab insert in the tab bar, from its top face.
+   3. Install the fan inserts and the clamp inserts in the shrouds, and the fan inserts in the
       backplate fan mount.
-   5. Install the four fan hub inserts in the plate extension of the backplate fan mount, from the
+   4. Install the four fan hub inserts in the plate extension of the backplate fan mount, from the
       side of its feet.
 3. **Side frames.**
    1. Install a BHCS M5x10 in each end of the uprights. Keep 2 mm between the head and the end of
@@ -34,15 +30,15 @@ the items in [`BOM.md`](../BOM.md).
    4. Make the right side frame in the same way.
 4. **Box.**
    1. Install a BHCS M5x10 in each end of the three cross rails, as in step 3.
-   2. Put the back brace between the two back uprights. Put the bumps on its ends into the inner slots
-      of the uprights, and align its screw holes with the holes in the uprights. Move the two side
-      frames together on the bumps.
-   3. Slide two cross rails in from the front: one at the top and one at the bottom. The screw heads
+   2. Put a T-nut into the inner slot of each back upright, near the bottom.
+   3. Put the back brace between the two back uprights. Put the bumps on its ends into the inner slots
+      of the uprights. Move the two side frames together on the bumps.
+   4. Slide two cross rails in from the front: one at the top and one at the bottom. The screw heads
       go into the inner slots of the long rails.
-   4. Tighten the screws through the access holes in the outer faces of the long rails.
-   5. Install a BHCS M3x20 through each back upright, from its outer side, into the insert in the
-      back brace.
-   6. Keep the third cross rail for step 11. It goes at the top of the back.
+   5. Tighten the screws through the access holes in the outer faces of the long rails.
+   6. Install a BHCS M3x10 through each end wall of the back brace, from its window, into the
+      T-nut. Do not tighten the screws yet.
+   7. Keep the third cross rail for step 11. It goes at the top of the back.
 5. **T-nuts.** Put the M3 T-nuts into the slots below the screw holes of each panel. Use the panel
    as a template. The T-nuts go in from the front of the slot, so you can install them at any time.
 6. **Bottom panel.** Join the two pieces of the bottom panel with a top and bottom splice strip and
@@ -60,14 +56,21 @@ the items in [`BOM.md`](../BOM.md).
 8. **PSU.**
    1. Install the PSU mount on the top faces of the bottom long rails, with two FHCS M3x16 into
       T-nuts. Its plate goes toward the back.
-   2. Slide the PSU in from the back, below the back brace, with its modular sockets first. It goes on
-      the bottom panel, between the bottom rails. Push it until the lip in front of the sockets touches the
-      plate of the PSU mount.
+   2. Lift the back brace. Slide the PSU in from the back, below the back brace, with its modular
+      sockets first. It goes on the bottom panel, between the bottom rails. Push it until the lip in
+      front of the sockets touches the plate of the PSU mount.
    3. Install two FHCS #6-32 x 3/8" through the plate into the lip.
-   4. Install the bottom piece of the back panel with FHCS M3x10, and the two PSU screws through it.
+   4. Lower the back brace onto the PSU. Tighten the two brace screws through the windows with a
+      ball-end hex key. The PSU sets the height of the brace.
+   5. Install the bottom piece of the back panel with FHCS M3x10, and the two PSU screws through it.
       The PSU is then held at both ends. This piece stays on when you remove the top piece.
-9. **Tab bar.** Put the tab bar between the back uprights, at the top. Install a BHCS M3x20 through
-   each back upright, from its outer side, into the insert in the end block.
+9. **Tab bar.**
+   1. Put a T-nut into the inner slot of each back upright, near the top.
+   2. Put the tab bar between the back uprights, at the top. Put the bumps on its ends into the inner
+      slots of the uprights.
+   3. Install a BHCS M3x10 through each end wall of the tab bar, from the inner side, into the
+      T-nut. Use a ball-end hex key. Do not tighten the screws yet.
+   4. Push the tab bar up until the bumps touch the top long rails. Tighten the two screws.
 10. **Board.**
     1. Attach the shrouds to the BC-250 with the clamps. Install the backplate fan mount. Do not
        install the slim fan or the fan hub yet.
@@ -141,16 +144,3 @@ To drill a hole:
 3. Hold the jig. Drill a 5 mm hole through the guide bore. Drill through the slot and the centre of
    the rail until the drill goes into the opposite slot. Do not cut the lips of the opposite slot.
 4. Remove the burrs and the chips.
-
-## Brace screw holes
-
-The two back uprights each have two 3.4 mm holes through them, 29 mm from each end. The hole near
-the bottom is for the back brace screw. The hole near the top is for the tab bar screw.
-
-1. Put the jig on an end of the upright. Put the bump of the jig into the slot
-   of a side face.
-2. Push the jig until the end of the upright touches the end stop.
-3. Drill a 3.4 mm hole through the small guide bore (29 mm from the end). Drill through the full
-   upright, into the slot on the opposite face.
-4. Do steps 1 to 3 again at the other end of the upright.
-5. Remove the burrs and the chips.
