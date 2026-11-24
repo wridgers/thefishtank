@@ -111,6 +111,10 @@ FRAME = [
     # hex deboss pattern on the front panel's outer face (the panels print on their outer face, so the
     # grooves print upside down: their 45 deg walls need no supports)
     ('HexP', 35.3356, 'Pattern cell size across flats'),
+    ('FrontCrossScrewDZ', '=1.5 * HexP / 2 / cos(30)', 'Front panel screws in the cross rails: two, this far either side '
+                          'of the middle, each in the middle of a hex cell (clear of the grooves)'),
+    ('FrontSideScrewDY', '=2 * HexP', 'Front panel screws in the uprights: at the middle, and this far above and below '
+                         'it, each in the middle of a hex cell (no nearer the long rails than CornerNutY)'),
     ('GrooveW', 1.6, 'Pattern V-groove width'), ('GrooveD', '=GrooveW / 2', 'Pattern V-groove depth (45 deg walls)'),
     ('PatternClear', 2.0, 'Grooves stop short of openings, countersinks, feet and the edge chamfers by this'),
     ('PatternMinRun', 5.0, 'Groove pieces left shorter than this by the masking are dropped'),
@@ -153,6 +157,8 @@ FRAME = [
     ('SplitRX', '=PanelMidX - GrillL / 2 - GrillMargin - SpliceW / 2', 'Right panel splits (X): either side of its '
                 'grill, with the splice strips clear of it (one split would leave a piece longer than the bed)'),
     ('SplitRX2', '=2 * PanelMidX - SplitRX', ''),
+    ('GrillEndL', '=SplitRX - SpliceW / 2 - XBackIn - ExtW - 2 * GrillMargin', 'Right panel end grills (one on each end '
+                  'piece): length (X), between the upright and the splice strip, GrillMargin clear of each'),
     ('InsertD', 4.4, 'Heat-set insert hole (M3x5x4)'), ('InsertDepth', 5.0, ''), ('ScrewD', 3.2, 'Screw hole past an insert'),
     # --- PSU screws and exhaust in the back panel
     ('PsuHoleY1', 4.1, '#6-32 holes on the AC face, above the PSU bottom'), ('PsuHoleY2', 36.1, ''),
@@ -693,7 +699,10 @@ def build_panels(P):
                 L.keep_circle(u, v, g('CsinkD') / 2)
     R = Panel(P, 'PanelRight', 'Z', zr, 1, (xb, xf), (yb, yt), [g('SplitRX'), g('SplitRX2')])  # backplate fan intake
     bumps(R, side_runs)
-    grills['R'] = [side_grill(g('PanelMidX'))]  # backplate fan intake
+    # backplate fan intake in the middle, and a narrow grill on each end piece: the splits fall in the bars between
+    ex = xb + w + g('GrillMargin') + g('GrillEndL') / 2
+    grills['R'] = [side_grill(g('PanelMidX'))] + [('rrect', x, mid_y, g('GrillEndL'), g('GrillW'), g('GrillR'))
+                                                  for x in (ex, 2 * g('PanelMidX') - ex)]
     for pn in (L, R):
         pieces = rail_screws(pn)
         for x in (x for pc in pieces for x in pc):
@@ -767,12 +776,13 @@ def build_panels(P):
     F.bed_circle(g('ButtonY'), g('ButtonZ'), g('ButtonHoleD') / 2)
     F.bed_poly([(sy0, hz0), (sy1, hz0), (sy1, hz1), (sy0, hz1)])  # the port slot
     F.keep_poly([(sy0, hz0), (sy1, hz0), (sy1, hz1), (sy0, hz1)])
-    for pn in (F,):  # corners and middle, in the uprights' slots
-        for y in (yb + g('CornerNutY'), mid_y, yt - g('CornerNutY')):
-            for z in (zr + c, zl - c):
-                pn.screw('panel', y, z, 'Y')
-    for y in (yb + c, yt - c):  # the front cross rails
-        F.screw('panel', y, mid_z, 'Z')
+    for y in (mid_y - g('FrontSideScrewDY'), mid_y, mid_y + g('FrontSideScrewDY')):  # in the uprights, in hex cells
+        assert yb + g('CornerNutY') <= y <= yt - g('CornerNutY'), 'front panel screw: no room for its T-nut'
+        for z in (zr + c, zl - c):
+            F.screw('panel', y, z, 'Y')
+    for y in (yb + c, yt - c):  # the front cross rails: two each, in hex cells
+        for z in (mid_z - g('FrontCrossScrewDZ'), mid_z + g('FrontCrossScrewDZ')):
+            F.screw('panel', y, z, 'Z')
 
     for k, pn in (('L', L), ('R', R), ('T', T), ('K', K)):
         for sh in grills[k]:

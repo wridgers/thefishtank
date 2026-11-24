@@ -34,9 +34,9 @@ For the parts to print, refer to [stls/README.md](stls/README.md).
 | 4 | BHCS M3x25 (ISO 7380) |
 | 14 | BHCS M5x10 (ISO 7380), for the blind joints |
 | 4 | FHCS #6-32 x 3/8" (82 deg), for the PSU |
-| 83 | FHCS M3x10 (ISO 10642 / DIN 7991) |
+| 85 | FHCS M3x10 (ISO 10642 / DIN 7991) |
 | 12 | FHCS M3x16 (ISO 10642 / DIN 7991) |
 | 4 | FHCS M3x25 (ISO 10642 / DIN 7991) |
 | 8 | FHCS M3x40 (ISO 10642 / DIN 7991) |
-| 85 | M3 drop-in T-nut for 2020 slots |
+| 87 | M3 drop-in T-nut for 2020 slots |
 | 38 | [M3 heat-set insert (M3 x 5 mm OD x 4 mm)](https://jb3d.uk/product/50-threaded-heat-set-inserts-m3-x-d5-0-x-l4-0/) |
